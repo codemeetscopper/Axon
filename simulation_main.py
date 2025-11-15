@@ -3,9 +3,9 @@ from __future__ import annotations
 import random
 import sys
 from functools import partial
-from typing import Callable
+from typing import Callable, Sequence
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -25,30 +25,42 @@ from PySide6.QtWidgets import (
 
 from app_palette import apply_dark_palette
 from robot_control.sensor_data import SensorSample
-from robot_main import TelemetryPanel
+from telemetry_panel import TelemetryPanel
 from robotic_face_widget import RoboticFaceWidget
 
 # Backwards compatibility for external imports expecting the old helper name.
 _apply_dark_palette = apply_dark_palette
 
 
-class RobotScreen(QWidget):
-    """Widget that mirrors the robot's 800x480 display with telemetry overlay."""
+class FaceTelemetryDisplay(QWidget):
+    """Composite widget that overlays telemetry on top of the face widget."""
 
     def __init__(
         self,
         face: RoboticFaceWidget,
         telemetry: TelemetryPanel,
         parent: QWidget | None = None,
+        fixed_size: QSize | Sequence[int] | None = QSize(800, 480),
     ) -> None:
         super().__init__(parent)
         self._face = face
         self._telemetry = telemetry
+        self._fixed_size = fixed_size
         self._build_ui()
 
     def _build_ui(self) -> None:
         self.setObjectName("robotScreen")
-        self.setFixedSize(800, 480)
+        if self._fixed_size is not None:
+            if isinstance(self._fixed_size, QSize):
+                size = self._fixed_size
+            else:
+                width, height = self._fixed_size
+                size = QSize(int(width), int(height))
+            self.setFixedSize(size)
+        else:
+            self.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         stack = QStackedLayout(self)
@@ -61,6 +73,7 @@ class RobotScreen(QWidget):
         face_layout = QVBoxLayout(face_layer)
         face_layout.setContentsMargins(0, 0, 0, 0)
         face_layout.setSpacing(0)
+        self._face.setParent(face_layer)
         self._face.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -377,7 +390,7 @@ class MainWindow(QWidget):
         self.telemetry = TelemetryPanel()
         self.telemetry.expand()
 
-        display = RobotScreen(self.face, self.telemetry)
+        display = FaceTelemetryDisplay(self.face, self.telemetry)
         layout.addWidget(display, 0, Qt.AlignmentFlag.AlignTop)
 
         panel = ControlPanel(self.face, self.telemetry)
