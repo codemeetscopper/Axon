@@ -70,7 +70,7 @@ class RobotScreen(QWidget):
         overlay = QWidget(self)
         overlay.setObjectName("robotScreenOverlay")
         overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.setContentsMargins(24, 24, 24, 24)
+        overlay_layout.setContentsMargins(16, 16, 16, 16)
         overlay_layout.setSpacing(0)
         overlay_layout.addStretch(1)
 

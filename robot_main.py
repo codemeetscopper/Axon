@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap, 
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -58,6 +59,7 @@ class TelemetryPanel(QFrame):
         self._layout: Optional[QHBoxLayout] = None
         self._collapsed = True
         self._streaming = False
+        self._shadow: Optional[QGraphicsDropShadowEffect] = None
         self.setObjectName("telemetryPanel")
         self._build_ui()
         self.set_streaming(False)
@@ -67,12 +69,12 @@ class TelemetryPanel(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
             "#telemetryPanel {"
-            "background-color: rgba(8, 14, 34, 0.06);"
+            "background-color: rgba(10, 18, 38, 0.22);"
             "border-radius: 18px;"
-            "border: none;"
+            "border: 1px solid rgba(90, 120, 190, 0.28);"
             "}"
             "#telemetryPanel[collapsed=\"true\"] {"
-            "background-color: rgba(8, 14, 34, 0.18);"
+            "background-color: rgba(10, 18, 38, 0.32);"
             "}"
             "#telemetryPanel QLabel {"
             "color: #e8f1ff;"
@@ -89,9 +91,10 @@ class TelemetryPanel(QFrame):
         self._toggle_button = QPushButton()
         self._toggle_button.setObjectName("telemetryToggle")
         self._toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_button.setFixedSize(38, 32)
+        self._toggle_button.setMinimumSize(88, 32)
         self._toggle_button.setToolTip("Show/Hide telemetry")
         self._toggle_button.clicked.connect(self.toggle)
+        self._toggle_button.setText("Telemetry")
         layout.addWidget(self._toggle_button, 0, Qt.AlignmentFlag.AlignLeft)
 
         content = QFrame()
@@ -137,6 +140,13 @@ class TelemetryPanel(QFrame):
         content_layout.addStretch(1)
         self._apply_toggle_palette()
         self._update_toggle_icon()
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(38)
+        shadow.setOffset(0, 6)
+        self.setGraphicsEffect(shadow)
+        self._shadow = shadow
+        self._update_shadow()
 
     def _build_icon_pixmap(self, icon_key: str, color: str) -> QPixmap:
         size = 22
@@ -313,6 +323,7 @@ class TelemetryPanel(QFrame):
             style.unpolish(self)
             style.polish(self)
         self._update_toggle_icon()
+        self._update_shadow()
         self.updateGeometry()
         self.collapsedChanged.emit(collapsed)
 
@@ -327,16 +338,16 @@ class TelemetryPanel(QFrame):
         if self._toggle_button is None:
             return
         accent = "#2DD881" if self._streaming else "#9AA2B8"
-        base_bg = "rgba(45, 216, 129, 0.28)" if self._streaming else "rgba(154, 162, 184, 0.34)"
-        hover_bg = "rgba(45, 216, 129, 0.38)" if self._streaming else "rgba(154, 162, 184, 0.44)"
-        pressed_bg = "rgba(45, 216, 129, 0.48)" if self._streaming else "rgba(154, 162, 184, 0.54)"
+        base_bg = "rgba(45, 216, 129, 0.22)" if self._streaming else "rgba(154, 162, 184, 0.26)"
+        hover_bg = "rgba(45, 216, 129, 0.32)" if self._streaming else "rgba(154, 162, 184, 0.38)"
+        pressed_bg = "rgba(45, 216, 129, 0.44)" if self._streaming else "rgba(154, 162, 184, 0.50)"
         self._toggle_button.setStyleSheet(
             "#telemetryToggle {"
             f"background-color: {base_bg};"
             "border: none;"
-            "border-radius: 16px;"
+            "border-radius: 18px;"
             f"color: {accent};"
-            "padding: 4px;"
+            "padding: 6px 12px;"
             "}"
             "#telemetryToggle:hover {"
             f"background-color: {hover_bg};"
@@ -364,6 +375,19 @@ class TelemetryPanel(QFrame):
         self._streaming = streaming
         self._apply_toggle_palette()
         self._update_toggle_icon()
+        self._update_shadow()
+
+    def _update_shadow(self) -> None:
+        if self._shadow is None:
+            return
+        if self._collapsed:
+            opacity = 70
+        else:
+            opacity = 110 if self._streaming else 90
+        accent = QColor("#2DD881") if self._streaming else QColor("#6B7791")
+        color = QColor(accent)
+        color.setAlpha(opacity)
+        self._shadow.setColor(color)
 
 
 class RobotMainWindow(QWidget):
@@ -389,7 +413,7 @@ class RobotMainWindow(QWidget):
 
         overlay = QWidget(screen)
         overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.setContentsMargins(24, 24, 24, 24)
+        overlay_layout.setContentsMargins(16, 16, 16, 16)
         overlay_layout.setSpacing(0)
         overlay_layout.addStretch(1)
 
