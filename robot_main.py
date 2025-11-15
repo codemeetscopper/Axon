@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import logging
 import signal
 import sys
@@ -143,16 +142,25 @@ class RobotRuntime(QWidget):
         self._timer.setInterval(poll_interval_ms)
         self._timer.timeout.connect(self._poll)
         self._missed_cycles = 0
+        self._running = False
 
     def start(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        self._reader.start()
         self._timer.start()
 
     def stop(self) -> None:
+        if not self._running:
+            self._reader.stop()
+            return
+        self._running = False
         self._timer.stop()
-        self._reader.close()
+        self._reader.stop()
 
     def _poll(self) -> None:
-        sample = self._reader.read_latest()
+        sample = self._reader.pop_latest()
         if sample is None:
             self._missed_cycles += 1
             if self._missed_cycles >= 10:
@@ -164,23 +172,10 @@ class RobotRuntime(QWidget):
         self._telemetry.update_sample(sample)
 
 
-def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Axon runtime that drives the robotic face")
-    parser.add_argument("--port", default="/dev/ttyAMA0", help="Serial port that streams Axon telemetry")
-    parser.add_argument("--baudrate", type=int, default=115200, help="Serial baud rate")
-    parser.add_argument(
-        "--poll-interval",
-        type=int,
-        default=40,
-        help="Polling interval in milliseconds for the serial connection",
-    )
-    parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Logging verbosity",
-    )
-    return parser
+DEFAULT_SERIAL_PORT = "/dev/ttyAMA0"
+DEFAULT_BAUDRATE = 115200
+DEFAULT_POLL_INTERVAL_MS = 40
+DEFAULT_LOG_LEVEL = "INFO"
 
 
 def _configure_logging(level: str) -> None:
@@ -190,14 +185,11 @@ def _configure_logging(level: str) -> None:
     )
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    parser = _build_arg_parser()
-    args = parser.parse_args(argv)
-
-    _configure_logging(args.log_level)
+def main() -> int:
+    _configure_logging(DEFAULT_LOG_LEVEL)
 
     try:
-        reader = SerialReader(port=args.port, baudrate=args.baudrate)
+        reader = SerialReader(port=DEFAULT_SERIAL_PORT, baudrate=DEFAULT_BAUDRATE)
     except RuntimeError as exc:
         LOGGER.error("%s", exc)
         return 1
@@ -214,7 +206,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     telemetry = TelemetryPanel()
     window = RobotMainWindow(face, telemetry)
 
-    runtime = RobotRuntime(reader, controller, telemetry, poll_interval_ms=args.poll_interval)
+    runtime = RobotRuntime(
+        reader,
+        controller,
+        telemetry,
+        poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
+    )
     app.aboutToQuit.connect(runtime.stop)
 
     # Support clean shutdown when Ctrl+C is pressed on the console.
@@ -224,7 +221,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     window.resize(960, 600)
     window.show()
 
-    return app.exec()
+    try:
+        return app.exec()
+    except KeyboardInterrupt:
+        LOGGER.info("Keyboard interrupt received; shutting down.")
+        app.quit()
+        return 0
+    finally:
+        runtime.stop()
 
 
 if __name__ == "__main__":
