@@ -157,7 +157,7 @@ class RoboticFaceWidget(QWidget):
         )
 
         center = face_rect.center()
-        head_size = min(face_rect.width(), face_rect.height()) * 1.0
+        head_size = min(face_rect.width(), face_rect.height()) * 1.2
         face_rect = QRectF(
             center.x() - head_size * 0.5,
             center.y() - head_size * 0.5,
@@ -175,9 +175,9 @@ class RoboticFaceWidget(QWidget):
         head_gradient.setColorAt(0.4, QColor(26, 32, 58))
         head_gradient.setColorAt(1.0, QColor(10, 14, 28))
         painter.setBrush(head_gradient)
-        # painter.setPen(QPen(QColor(110, 140, 220, 140), face_rect.width() * 0.012))
+        painter.setPen(QPen(QColor(110, 140, 220, 140), face_rect.width() * 0.012))
         head_path = QPainterPath()
-        head_path.addEllipse(face_rect)
+        # head_path.addEllipse(face_rect)
         painter.drawPath(head_path)
 
         accent_color: QColor = self._state["accent_color"]
