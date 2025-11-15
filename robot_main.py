@@ -6,7 +6,15 @@ import sys
 from typing import Callable, Optional
 
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from robot_control import EmotionPolicy, FaceController, SerialReader
 from robot_control.sensor_data import SensorSample
@@ -26,28 +34,29 @@ Formatter = Callable[[float], str]
 class TelemetryPanel(QFrame):
     """Display the latest telemetry sample."""
 
-    _FIELDS: tuple[tuple[str, str, Formatter], ...] = (
-        ("left_speed", "⬅️", lambda value: f"{value:.0f}"),
-        ("right_speed", "➡️", lambda value: f"{value:.0f}"),
-        ("roll", "🌀", lambda value: f"{value:+.1f}°"),
-        ("pitch", "↕️", lambda value: f"{value:+.1f}°"),
-        ("yaw", "🧭", lambda value: f"{value:+.1f}°"),
-        ("temperature_c", "🌡️", lambda value: f"{value:.1f}°C"),
-        ("voltage_v", "🔋", lambda value: f"{value:.2f}V"),
+    _FIELDS: tuple[tuple[str, str, Formatter, str], ...] = (
+        ("left_speed", "◀", lambda value: f"{value:.0f}", "#4CC9F0"),
+        ("right_speed", "▶", lambda value: f"{value:.0f}", "#4895EF"),
+        ("roll", "⟳", lambda value: f"{value:+.1f}°", "#4361EE"),
+        ("pitch", "↕", lambda value: f"{value:+.1f}°", "#560BAD"),
+        ("yaw", "◎", lambda value: f"{value:+.1f}°", "#B5179E"),
+        ("temperature_c", "☀", lambda value: f"{value:.1f}°C", "#F72585"),
+        ("voltage_v", "⚡", lambda value: f"{value:.2f}V", "#2DD881"),
     )
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._labels: dict[str, QLabel] = {}
+        self._value_labels: dict[str, QLabel] = {}
         self._formatters: dict[str, Formatter] = {}
-        self._icons: dict[str, str] = {}
-        self._status_icon = QLabel("⚫")
+        self._status_icon = QLabel("●")
+        self._status_icon.setObjectName("telemetryStatus")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setObjectName("telemetryPanel")
         self._build_ui()
         self.set_streaming(False)
 
     def _build_ui(self) -> None:
-        self.setFixedHeight(72)
+        self.setFixedHeight(56)
         self.setStyleSheet(
             "#telemetryPanel {"
             "background: rgba(6, 10, 24, 0.92);"
@@ -55,43 +64,78 @@ class TelemetryPanel(QFrame):
             "}"
             "#telemetryPanel QLabel {"
             "color: #e8f1ff;"
-            "font-size: 18px;"
+            "font-size: 17px;"
             "font-weight: 600;"
+            "}"
+            "#telemetryPanel QLabel#telemetryStatus {"
+            "font-size: 16px;"
             "}"
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(24, 12, 24, 12)
-        layout.setSpacing(20)
+        layout.setContentsMargins(18, 8, 18, 8)
+        layout.setSpacing(12)
 
         self._status_icon.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        self._status_icon.setFixedWidth(20)
         layout.addWidget(self._status_icon)
 
-        for field, icon, formatter in self._FIELDS:
-            label = QLabel(f"{icon} --")
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setObjectName(f"telemetry_{field}")
-            layout.addWidget(label)
-            self._labels[field] = label
+        for field, icon, formatter, color in self._FIELDS:
+            try:
+                r = int(color[1:3], 16)
+                g = int(color[3:5], 16)
+                b = int(color[5:7], 16)
+            except (ValueError, IndexError):
+                r, g, b = (76, 201, 240)
+            container = QFrame()
+            container.setObjectName("telemetryItem")
+            container.setProperty("dataRole", field)
+            container.setStyleSheet(
+                "QFrame#telemetryItem {"
+                f"background-color: rgba({r}, {g}, {b}, 0.18);"
+                "border-radius: 14px;"
+                "padding: 6px 10px;"
+                "}"
+            )
+            container_layout = QHBoxLayout(container)
+            container_layout.setContentsMargins(8, 2, 8, 2)
+            container_layout.setSpacing(6)
+
+            icon_label = QLabel(icon)
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+            icon_label.setStyleSheet(
+                f"color: {color}; font-size: 20px; font-weight: 600;"
+            )
+            container_layout.addWidget(icon_label)
+
+            value_label = QLabel("--")
+            value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+            value_label.setStyleSheet(
+                f"color: {color}; font-size: 18px; font-weight: 600;"
+            )
+            container_layout.addWidget(value_label)
+
+            layout.addWidget(container)
+            self._value_labels[field] = value_label
             self._formatters[field] = formatter
-            self._icons[field] = icon
 
         layout.addStretch(1)
 
     def update_sample(self, sample: SensorSample) -> None:
         values = sample.as_dict()
-        for field, label in self._labels.items():
+        for field, label in self._value_labels.items():
             value = values.get(field)
             formatter = self._formatters.get(field, lambda v: str(v))
-            icon = self._icons.get(field, "")
             if value is None:
-                label.setText(f"{icon} --")
+                label.setText("--")
             else:
-                label.setText(f"{icon} {formatter(value)}")
+                label.setText(formatter(value))
         self.set_streaming(True)
 
     def set_streaming(self, streaming: bool) -> None:
-        self._status_icon.setText("🟢" if streaming else "⚫")
+        color = "#2DD881" if streaming else "#7A8194"
+        self._status_icon.setText("●")
+        self._status_icon.setStyleSheet(f"color: {color};")
         self._status_icon.setToolTip("Streaming" if streaming else "Idle")
 
 
@@ -106,16 +150,9 @@ class RobotMainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        face_frame = QFrame()
-        face_frame.setFrameShape(QFrame.Shape.NoFrame)
-        face_layout = QVBoxLayout(face_frame)
-        face_layout.setContentsMargins(24, 24, 24, 12)
-        face_layout.setSpacing(0)
-        face_layout.addStretch(1)
-        face_layout.addWidget(face, alignment=Qt.AlignmentFlag.AlignCenter)
-        face_layout.addStretch(1)
-        layout.addWidget(face_frame, 1)
-        layout.setStretchFactor(face_frame, 1)
+        face.setParent(self)
+        face.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(face, 1)
 
         telemetry.setParent(self)
         layout.addWidget(telemetry, 0)
