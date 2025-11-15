@@ -375,6 +375,27 @@ class RoboticFaceWidget(QWidget):
             center.y() + face_rect.height() * 0.26 + self._breathe_offset * 0.12 - face_rect.height() * 0.035 * smile_factor,
         )
 
+        pen_color = QColor(
+            int(accent.red() * 0.75 + 35),
+            int(accent.green() * 0.75 + 35),
+            int(accent.blue() * 0.75 + 45),
+        )
+        stroke_width = max(1.8, face_rect.width() * 0.0045)
+
+        emotion = self._current_emotion
+
+        if emotion == "neutral":
+            self._draw_mouth_neutral(painter, mouth_center, face_rect, pen_color, stroke_width)
+            return
+
+        if emotion == "happy":
+            self._draw_mouth_happy(painter, mouth_center, face_rect, accent, pen_color, stroke_width)
+            return
+
+        if emotion == "surprised":
+            self._draw_mouth_surprised(painter, mouth_center, face_rect, accent, pen_color, stroke_width)
+            return
+
         mouth_width = face_rect.width() * width_factor
         mouth_height = face_rect.height() * height_factor
 
@@ -430,13 +451,6 @@ class RoboticFaceWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPath(fill_path)
 
-        pen_color = QColor(
-            int(accent.red() * 0.75 + 35),
-            int(accent.green() * 0.75 + 35),
-            int(accent.blue() * 0.75 + 45),
-        )
-
-        stroke_width = max(1.8, face_rect.width() * 0.0045)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(pen_color, stroke_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawPath(top_path)
@@ -473,6 +487,153 @@ class RoboticFaceWidget(QWidget):
 
         painter.restore()
 
+    def _draw_mouth_neutral(
+        self,
+        painter: QPainter,
+        mouth_center: QPointF,
+        face_rect: QRectF,
+        pen_color: QColor,
+        stroke_width: float,
+    ) -> None:
+        painter.save()
+
+        adjusted_center = QPointF(mouth_center)
+        rect_width = face_rect.width() * 0.32 * self._state["mouth_width"]
+        rect_height = max(24.0, min(34.0, face_rect.height() * 0.06))
+
+        horizontal_margin = face_rect.width() * 0.08
+        vertical_margin = face_rect.height() * 0.1
+        max_center_x = face_rect.right() - horizontal_margin - rect_width * 0.5
+        min_center_x = face_rect.left() + horizontal_margin + rect_width * 0.5
+        adjusted_center.setX(max(min_center_x, min(max_center_x, adjusted_center.x())))
+
+        face_center_y = face_rect.center().y()
+        max_center_y = face_rect.bottom() - vertical_margin - rect_height * 0.5
+        min_center_y = face_center_y + face_rect.height() * 0.05
+        adjusted_center.setY(max(min_center_y, min(max_center_y, adjusted_center.y())))
+
+        rect = QRectF(
+            adjusted_center.x() - rect_width * 0.5,
+            adjusted_center.y() - rect_height * 0.5,
+            rect_width,
+            rect_height,
+        )
+
+        fill_color = QColor(
+            int(pen_color.red() * 0.8 + 25),
+            int(pen_color.green() * 0.8 + 25),
+            int(pen_color.blue() * 0.8 + 25),
+            150,
+        )
+
+        painter.setBrush(fill_color)
+        painter.setPen(QPen(pen_color, stroke_width * 0.85, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawRect(rect)
+        painter.restore()
+
+    def _draw_mouth_happy(
+        self,
+        painter: QPainter,
+        mouth_center: QPointF,
+        face_rect: QRectF,
+        accent: QColor,
+        pen_color: QColor,
+        stroke_width: float,
+    ) -> None:
+        painter.save()
+
+        adjusted_center = QPointF(mouth_center)
+        mouth_width = face_rect.width() * 0.46 * self._state["mouth_width"]
+        smile_height = face_rect.height() * 0.11
+        thickness = max(10.0, face_rect.height() * 0.035)
+
+        horizontal_margin = face_rect.width() * 0.08
+        max_center_x = face_rect.right() - horizontal_margin - mouth_width * 0.5
+        min_center_x = face_rect.left() + horizontal_margin + mouth_width * 0.5
+        adjusted_center.setX(max(min_center_x, min(max_center_x, adjusted_center.x())))
+
+        face_center_y = face_rect.center().y()
+        vertical_margin = face_rect.height() * 0.1
+        max_center_y = face_rect.bottom() - vertical_margin - thickness
+        min_center_y = face_center_y + face_rect.height() * 0.04
+        adjusted_center.setY(max(min_center_y, min(max_center_y, adjusted_center.y())))
+
+        outer_left = QPointF(adjusted_center.x() - mouth_width * 0.5, adjusted_center.y() - thickness * 0.35)
+        outer_right = QPointF(adjusted_center.x() + mouth_width * 0.5, adjusted_center.y() - thickness * 0.35)
+        outer_control = QPointF(adjusted_center.x(), adjusted_center.y() + smile_height)
+
+        inner_right = QPointF(adjusted_center.x() + mouth_width * 0.38, adjusted_center.y() + thickness * 0.65)
+        inner_left = QPointF(adjusted_center.x() - mouth_width * 0.38, adjusted_center.y() + thickness * 0.65)
+        inner_control = QPointF(adjusted_center.x(), adjusted_center.y() + smile_height * 1.08)
+
+        path = QPainterPath(outer_left)
+        path.quadTo(outer_control, outer_right)
+        path.lineTo(inner_right)
+        path.quadTo(inner_control, inner_left)
+        path.closeSubpath()
+
+        fill_color = QColor(
+            int(accent.red() * 0.6 + 65),
+            int(accent.green() * 0.6 + 55),
+            int(accent.blue() * 0.6 + 70),
+            170,
+        )
+
+        painter.setBrush(fill_color)
+        painter.setPen(QPen(pen_color, stroke_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawPath(path)
+        painter.restore()
+
+    def _draw_mouth_surprised(
+        self,
+        painter: QPainter,
+        mouth_center: QPointF,
+        face_rect: QRectF,
+        accent: QColor,
+        pen_color: QColor,
+        stroke_width: float,
+    ) -> None:
+        painter.save()
+
+        adjusted_center = QPointF(mouth_center)
+        base_size = face_rect.width() * 0.22 * self._state["mouth_width"]
+        size = max(38.0, base_size)
+
+        horizontal_margin = face_rect.width() * 0.08
+        vertical_margin = face_rect.height() * 0.1
+        max_center_x = face_rect.right() - horizontal_margin - size * 0.5
+        min_center_x = face_rect.left() + horizontal_margin + size * 0.5
+        adjusted_center.setX(max(min_center_x, min(max_center_x, adjusted_center.x())))
+
+        face_center_y = face_rect.center().y()
+        max_center_y = face_rect.bottom() - vertical_margin - size * 0.5
+        min_center_y = face_center_y + face_rect.height() * 0.02
+        adjusted_center.setY(max(min_center_y, min(max_center_y, adjusted_center.y())))
+
+        rect = QRectF(
+            adjusted_center.x() - size * 0.5,
+            adjusted_center.y() - size * 0.5,
+            size,
+            size,
+        )
+
+        corner_radius = min(size * 0.45, 24.0 + face_rect.width() * 0.015)
+
+        fill_color = QColor(
+            int(accent.red() * 0.6 + 40),
+            int(accent.green() * 0.6 + 40),
+            int(accent.blue() * 0.6 + 60),
+            165,
+        )
+
+        painter.setBrush(fill_color)
+        painter.setPen(QPen(pen_color, stroke_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+        path = QPainterPath()
+        path.addRoundedRect(rect, corner_radius, corner_radius)
+        painter.drawPath(path)
+        painter.restore()
+
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
@@ -484,8 +645,8 @@ class RoboticFaceWidget(QWidget):
                 eye_curve=0.0,
                 brow_raise=0.0,
                 brow_tilt=0.0,
-                mouth_curve=0.2,
-                mouth_open=0.1,
+                mouth_curve=0.0,
+                mouth_open=0.05,
                 mouth_width=1.0,
                 mouth_height=1.0,
                 iris_size=1.0,
@@ -523,7 +684,7 @@ class RoboticFaceWidget(QWidget):
                 eye_curve=0.1,
                 brow_raise=0.5,
                 brow_tilt=0.0,
-                mouth_curve=0.2,
+                mouth_curve=0.0,
                 mouth_open=0.9,
                 mouth_width=0.95,
                 mouth_height=1.4,
