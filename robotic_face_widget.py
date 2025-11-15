@@ -31,7 +31,7 @@ class RoboticFaceWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumSize(640, 480)
+        self.setMinimumSize(480, 320)
 
         self._presets: Dict[str, EmotionPreset] = self._build_presets()
         self._current_emotion = "neutral"
