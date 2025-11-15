@@ -83,6 +83,12 @@ class RobotScreen(QWidget):
         overlay_layout.addWidget(dock, 0, Qt.AlignmentFlag.AlignLeft)
         stack.addWidget(overlay)
 
+        # Ensure the overlay paints above the face layer when the layout is in
+        # ``StackAll`` mode. Without explicitly raising the overlay, Qt keeps the
+        # face frame as the top-most widget, which hides the telemetry bar.
+        stack.setCurrentWidget(face_layer)
+        overlay.raise_()
+
         self.setStyleSheet(
             """
             #robotScreen {
