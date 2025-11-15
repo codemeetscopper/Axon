@@ -1,28 +1,50 @@
-# Axon-AI-bot
+# Robotic Face Widget
 
-Axon AI bot's face is a responsive, animated landing experience that communicates the brand's calm confidence and guides visitors through Axon's mission, capabilities, and personas.
+This project provides a fully featured robotic face widget built with PySide6. The widget presents a cute, expressive face for an AI robot display and exposes a simple API for integrating emotion and orientation controls.
 
-## Getting started
+## Features
 
-Open `index.html` in your browser to explore the experience. All assets are bundled locally aside from the ambient audio track and Google Fonts.
+- Smooth animations between a wide range of emotions (happy, sad, surprised, sleepy, curious, neutral, excited).
+- Dark-themed design with vibrant accents and subtle 3D lighting.
+- Rich API for updating the current emotion and the robot's yaw/pitch/roll orientation.
+- Idle breathing motion, blinking, and eye sparkle animations to keep the face feeling alive.
+- Designed for a 640x800 landscape screen (automatically scales to fit).
 
-### Features
+## Getting Started
 
-- **Adaptive theming** – Automatic detection of system preference with manual light/dark toggle.
-- **Animated avatar** – Breathing pulses and greeting motion establish Axon's visual identity.
-- **Persona explorer** – Sample responses and a demo panel to illustrate strategist, researcher, and companion modes.
-- **Scroll choreography** – Intersection-based reveal animations for content cards and trust timeline.
-- **Ambient mission brief** – Optional audio to set the tone for Axon's mission overview.
+### Prerequisites
 
-## Project structure
+- Python 3.9+
+- [PySide6](https://pypi.org/project/PySide6/)
 
+Install dependencies with:
+
+```bash
+pip install -r requirements.txt
 ```
-.
-├── index.html          # Main landing page
-├── assets
-│   ├── css
-│   │   └── styles.css  # Global styling and motion system
-│   └── js
-│       └── main.js     # Interactivity, theming, and demo logic
-└── README.md
+
+### Running the demo
+
+```bash
+python main.py
 ```
+
+Use the control panel to experiment with different emotions and orientation values.
+
+## Integrating the Widget
+
+Import and instantiate `RoboticFaceWidget` in your PySide6 project:
+
+```python
+from robotic_face_widget import RoboticFaceWidget
+
+face = RoboticFaceWidget()
+face.set_emotion("happy")
+face.set_orientation(yaw=10, pitch=-5, roll=2)
+```
+
+The widget is self-contained and can be embedded into any existing layout or window.
+
+## License
+
+This project is released under the MIT License. See [LICENSE](LICENSE) for details.
