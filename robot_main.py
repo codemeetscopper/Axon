@@ -56,23 +56,23 @@ class TelemetryPanel(QFrame):
         self._toggle_button: Optional[QPushButton] = None
         self._content_frame: Optional[QFrame] = None
         self._layout: Optional[QHBoxLayout] = None
-        self._collapsed = False
+        self._collapsed = True
         self._streaming = False
         self.setObjectName("telemetryPanel")
         self._build_ui()
         self.set_streaming(False)
-        self._set_collapsed(True)
+        self._set_collapsed(False)
 
     def _build_ui(self) -> None:
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
             "#telemetryPanel {"
-            "background-color: rgba(8, 14, 34, 0.05);"
+            "background-color: rgba(8, 14, 34, 0.06);"
             "border-radius: 18px;"
             "border: none;"
             "}"
             "#telemetryPanel[collapsed=\"true\"] {"
-            "background-color: transparent;"
+            "background-color: rgba(8, 14, 34, 0.18);"
             "}"
             "#telemetryPanel QLabel {"
             "color: #e8f1ff;"
@@ -89,7 +89,7 @@ class TelemetryPanel(QFrame):
         self._toggle_button = QPushButton()
         self._toggle_button.setObjectName("telemetryToggle")
         self._toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_button.setFixedSize(34, 28)
+        self._toggle_button.setFixedSize(38, 32)
         self._toggle_button.setToolTip("Show/Hide telemetry")
         self._toggle_button.clicked.connect(self.toggle)
         layout.addWidget(self._toggle_button, 0, Qt.AlignmentFlag.AlignLeft)
@@ -292,14 +292,18 @@ class TelemetryPanel(QFrame):
             self._content_frame.setVisible(False)
             self._content_frame.setMaximumWidth(0)
             self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            self.setMaximumWidth(self._toggle_button.sizeHint().width() + 12)
+            toggle_width = self._toggle_button.sizeHint().width()
+            pill_width = toggle_width + 18
+            self.setMinimumWidth(pill_width)
+            self.setMaximumWidth(pill_width)
             if self._layout is not None:
-                self._layout.setContentsMargins(0, 0, 0, 0)
+                self._layout.setContentsMargins(6, 6, 6, 6)
         else:
             self._content_frame.setVisible(True)
             self._content_frame.setMaximumWidth(16777215)
             self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             self.setMaximumWidth(16777215)
+            self.setMinimumWidth(0)
             if self._layout is not None:
                 self._layout.setContentsMargins(14, 10, 14, 10)
 
@@ -323,9 +327,9 @@ class TelemetryPanel(QFrame):
         if self._toggle_button is None:
             return
         accent = "#2DD881" if self._streaming else "#9AA2B8"
-        base_bg = "rgba(45, 216, 129, 0.16)" if self._streaming else "rgba(154, 162, 184, 0.16)"
-        hover_bg = "rgba(45, 216, 129, 0.26)" if self._streaming else "rgba(154, 162, 184, 0.26)"
-        pressed_bg = "rgba(45, 216, 129, 0.34)" if self._streaming else "rgba(154, 162, 184, 0.34)"
+        base_bg = "rgba(45, 216, 129, 0.28)" if self._streaming else "rgba(154, 162, 184, 0.34)"
+        hover_bg = "rgba(45, 216, 129, 0.38)" if self._streaming else "rgba(154, 162, 184, 0.44)"
+        pressed_bg = "rgba(45, 216, 129, 0.48)" if self._streaming else "rgba(154, 162, 184, 0.54)"
         self._toggle_button.setStyleSheet(
             "#telemetryToggle {"
             f"background-color: {base_bg};"
