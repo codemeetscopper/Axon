@@ -4,10 +4,11 @@ import random
 import sys
 from functools import partial
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFrame,
     QGridLayout,
@@ -27,6 +28,9 @@ class ControlPanel(QWidget):
     def __init__(self, face: RoboticFaceWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.face = face
+        self._cycle_timer = QTimer(self)
+        self._cycle_timer.setInterval(2600)
+        self._cycle_timer.timeout.connect(self._advance_cycle)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -41,6 +45,10 @@ class ControlPanel(QWidget):
         self.emotion_combo.addItems(self.face.available_emotions())
         self.emotion_combo.currentTextChanged.connect(self.face.set_emotion)
         layout.addWidget(self.emotion_combo)
+
+        self.cycle_checkbox = QCheckBox("Cycle emotions")
+        self.cycle_checkbox.toggled.connect(self._toggle_cycle)
+        layout.addWidget(self.cycle_checkbox)
 
         layout.addSpacing(20)
 
@@ -116,6 +124,25 @@ class ControlPanel(QWidget):
         choices = [emotion for emotion in emotions if emotion != current_text]
         next_emotion = random.choice(choices or emotions)
         self.emotion_combo.setCurrentText(next_emotion)
+
+    def _toggle_cycle(self, enabled: bool) -> None:
+        if enabled and len(self.face.available_emotions()) > 1:
+            self._cycle_timer.start()
+        else:
+            self._cycle_timer.stop()
+
+    def _advance_cycle(self) -> None:
+        emotions = list(self.face.available_emotions())
+        if len(emotions) < 2:
+            return
+        current_text = self.emotion_combo.currentText()
+        try:
+            index = emotions.index(current_text)
+        except ValueError:
+            index = -1
+        next_emotion = emotions[(index + 1) % len(emotions)]
+        if next_emotion != current_text:
+            self.emotion_combo.setCurrentText(next_emotion)
 
 
 class MainWindow(QWidget):
