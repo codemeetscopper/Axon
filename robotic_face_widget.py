@@ -148,7 +148,7 @@ class RoboticFaceWidget(QWidget):
         bg_gradient.setColorAt(1.0, QColor(2, 4, 12))
         painter.fillRect(rect, bg_gradient)
 
-        face_margin = rect.height() * 0.08
+        face_margin = min(rect.width(), rect.height()) * 0.035
         face_rect = QRectF(
             rect.left() + face_margin,
             rect.top() + face_margin,
@@ -157,7 +157,7 @@ class RoboticFaceWidget(QWidget):
         )
 
         center = face_rect.center()
-        head_size = min(face_rect.width(), face_rect.height()) * 1.2
+        head_size = min(face_rect.width(), face_rect.height()) * 0.98
         face_rect = QRectF(
             center.x() - head_size * 0.5,
             center.y() - head_size * 0.5,

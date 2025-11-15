@@ -5,7 +5,8 @@ import signal
 import sys
 from typing import Callable, Optional
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QPointF, QRectF, QTimer, Qt
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -35,13 +36,13 @@ class TelemetryPanel(QFrame):
     """Display the latest telemetry sample."""
 
     _FIELDS: tuple[tuple[str, str, Formatter, str], ...] = (
-        ("left_speed", "◀", lambda value: f"{value:.0f}", "#4CC9F0"),
-        ("right_speed", "▶", lambda value: f"{value:.0f}", "#4895EF"),
-        ("roll", "⟳", lambda value: f"{value:+.1f}°", "#4361EE"),
-        ("pitch", "↕", lambda value: f"{value:+.1f}°", "#560BAD"),
-        ("yaw", "◎", lambda value: f"{value:+.1f}°", "#B5179E"),
-        ("temperature_c", "☀", lambda value: f"{value:.1f}°C", "#F72585"),
-        ("voltage_v", "⚡", lambda value: f"{value:.2f}V", "#2DD881"),
+        ("left_speed", "left", lambda value: f"{value:.0f}", "#4CC9F0"),
+        ("right_speed", "right", lambda value: f"{value:.0f}", "#4895EF"),
+        ("roll", "roll", lambda value: f"{value:+.1f}°", "#4361EE"),
+        ("pitch", "pitch", lambda value: f"{value:+.1f}°", "#560BAD"),
+        ("yaw", "yaw", lambda value: f"{value:+.1f}°", "#B5179E"),
+        ("temperature_c", "temperature", lambda value: f"{value:.1f}°C", "#F72585"),
+        ("voltage_v", "voltage", lambda value: f"{value:.2f}V", "#2DD881"),
     )
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -56,7 +57,7 @@ class TelemetryPanel(QFrame):
         self.set_streaming(False)
 
     def _build_ui(self) -> None:
-        self.setFixedHeight(56)
+        self.setFixedHeight(44)
         self.setStyleSheet(
             "#telemetryPanel {"
             "background: rgba(6, 10, 24, 0.92);"
@@ -64,23 +65,23 @@ class TelemetryPanel(QFrame):
             "}"
             "#telemetryPanel QLabel {"
             "color: #e8f1ff;"
-            "font-size: 17px;"
+            "font-size: 15px;"
             "font-weight: 600;"
             "}"
             "#telemetryPanel QLabel#telemetryStatus {"
-            "font-size: 16px;"
+            "font-size: 14px;"
             "}"
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(18, 8, 18, 8)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(8)
 
         self._status_icon.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        self._status_icon.setFixedWidth(20)
+        self._status_icon.setFixedWidth(16)
         layout.addWidget(self._status_icon)
 
-        for field, icon, formatter, color in self._FIELDS:
+        for field, icon_key, formatter, color in self._FIELDS:
             try:
                 r = int(color[1:3], 16)
                 g = int(color[3:5], 16)
@@ -93,26 +94,27 @@ class TelemetryPanel(QFrame):
             container.setStyleSheet(
                 "QFrame#telemetryItem {"
                 f"background-color: rgba({r}, {g}, {b}, 0.18);"
-                "border-radius: 14px;"
-                "padding: 6px 10px;"
+                "border-radius: 12px;"
+                "padding: 4px 8px;"
                 "}"
             )
             container_layout = QHBoxLayout(container)
-            container_layout.setContentsMargins(8, 2, 8, 2)
-            container_layout.setSpacing(6)
+            container_layout.setContentsMargins(6, 0, 6, 0)
+            container_layout.setSpacing(4)
 
-            icon_label = QLabel(icon)
+            icon_label = QLabel()
             icon_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-            icon_label.setStyleSheet(
-                f"color: {color}; font-size: 20px; font-weight: 600;"
-            )
+            icon_pixmap = self._build_icon_pixmap(icon_key, color)
+            icon_label.setPixmap(icon_pixmap)
+            icon_label.setFixedSize(icon_pixmap.size())
             container_layout.addWidget(icon_label)
 
             value_label = QLabel("--")
             value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             value_label.setStyleSheet(
-                f"color: {color}; font-size: 18px; font-weight: 600;"
+                f"color: {color}; font-size: 15px; font-weight: 600;"
             )
+            value_label.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
             container_layout.addWidget(value_label)
 
             layout.addWidget(container)
@@ -120,6 +122,108 @@ class TelemetryPanel(QFrame):
             self._formatters[field] = formatter
 
         layout.addStretch(1)
+
+    def _build_icon_pixmap(self, icon_key: str, color: str) -> QPixmap:
+        size = 26
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        qcolor = QColor(color)
+        pen = QPen(qcolor)
+        pen.setWidthF(2.0)
+        painter.setPen(pen)
+        painter.setBrush(qcolor)
+
+        center = pixmap.rect().center()
+        w = float(size)
+        h = float(size)
+
+        if icon_key == "left":
+            points = QPolygonF(
+                [
+                    QPointF(w * 0.68, h * 0.22),
+                    QPointF(w * 0.36, h * 0.50),
+                    QPointF(w * 0.68, h * 0.78),
+                ]
+            )
+            painter.drawPolygon(points)
+            painter.drawLine(QPointF(w * 0.32, h * 0.50), QPointF(w * 0.84, h * 0.50))
+        elif icon_key == "right":
+            points = QPolygonF(
+                [
+                    QPointF(w * 0.32, h * 0.22),
+                    QPointF(w * 0.64, h * 0.50),
+                    QPointF(w * 0.32, h * 0.78),
+                ]
+            )
+            painter.drawPolygon(points)
+            painter.drawLine(QPointF(w * 0.68, h * 0.50), QPointF(w * 0.16, h * 0.50))
+        elif icon_key == "roll":
+            radius = w * 0.32
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(center, radius, radius)
+            painter.setBrush(qcolor)
+            arrow = QPolygonF(
+                [
+                    QPointF(w * 0.72, h * 0.30),
+                    QPointF(w * 0.88, h * 0.50),
+                    QPointF(w * 0.72, h * 0.70),
+                ]
+            )
+            painter.drawPolygon(arrow)
+        elif icon_key == "pitch":
+            painter.drawLine(QPointF(w * 0.50, h * 0.20), QPointF(w * 0.50, h * 0.80))
+            up = QPolygonF(
+                [
+                    QPointF(w * 0.50, h * 0.18),
+                    QPointF(w * 0.38, h * 0.36),
+                    QPointF(w * 0.62, h * 0.36),
+                ]
+            )
+            down = QPolygonF(
+                [
+                    QPointF(w * 0.50, h * 0.82),
+                    QPointF(w * 0.38, h * 0.64),
+                    QPointF(w * 0.62, h * 0.64),
+                ]
+            )
+            painter.drawPolygon(up)
+            painter.drawPolygon(down)
+        elif icon_key == "yaw":
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(center, w * 0.34, h * 0.34)
+            painter.drawLine(QPointF(w * 0.50, h * 0.20), QPointF(w * 0.50, h * 0.80))
+            painter.drawLine(QPointF(w * 0.20, h * 0.50), QPointF(w * 0.80, h * 0.50))
+            painter.setBrush(qcolor)
+            painter.drawEllipse(QPointF(w * 0.50, h * 0.50), w * 0.08, h * 0.08)
+        elif icon_key == "temperature":
+            bulb_center = QPointF(w * 0.48, h * 0.74)
+            painter.drawEllipse(bulb_center, w * 0.18, h * 0.18)
+            painter.drawRoundedRect(
+                QRectF(w * 0.42, h * 0.26, w * 0.12, h * 0.48),
+                w * 0.06,
+                h * 0.06,
+            )
+        elif icon_key == "voltage":
+            path = QPainterPath()
+            path.moveTo(w * 0.36, h * 0.16)
+            path.lineTo(w * 0.60, h * 0.16)
+            path.lineTo(w * 0.46, h * 0.48)
+            path.lineTo(w * 0.68, h * 0.48)
+            path.lineTo(w * 0.32, h * 0.84)
+            path.lineTo(w * 0.44, h * 0.52)
+            path.lineTo(w * 0.28, h * 0.52)
+            path.closeSubpath()
+            painter.drawPath(path)
+        else:
+            painter.setBrush(qcolor)
+            painter.drawEllipse(center, w * 0.24, h * 0.24)
+
+        painter.end()
+        return pixmap
 
     def update_sample(self, sample: SensorSample) -> None:
         values = sample.as_dict()
