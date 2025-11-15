@@ -29,6 +29,7 @@ class FaceController(QObject):
         self._rest_delay = 3.0
         self._rest_interval = 3.0
         self._rest_sequence: tuple[str, ...] = self._build_rest_sequence()
+        self._previous_sample: SensorSample | None = None
 
     def apply_sample(self, sample: SensorSample) -> None:
         """Update the face to reflect the latest telemetry sample."""
@@ -36,7 +37,8 @@ class FaceController(QObject):
         self._face.set_orientation(**sample.to_orientation())
 
         now = monotonic()
-        resting = sample.is_resting()
+        previous = self._previous_sample
+        resting = sample.is_resting(previous_sample=previous)
         next_emotion: Optional[str]
 
         cycle_emotion: Optional[str] = None
@@ -70,6 +72,8 @@ class FaceController(QObject):
                 next_emotion = self._policy.default_emotion
             else:
                 next_emotion = self._current_emotion or self._policy.default_emotion
+
+        self._previous_sample = sample
 
         if not next_emotion or next_emotion == self._current_emotion:
             return

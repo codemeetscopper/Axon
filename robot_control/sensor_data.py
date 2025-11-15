@@ -17,6 +17,10 @@ REST_ROLL_THRESHOLD = 3.0
 REST_PITCH_THRESHOLD = 3.0
 REST_YAW_THRESHOLD = 4.5
 
+REST_ROLL_DELTA_THRESHOLD = 0.5
+REST_PITCH_DELTA_THRESHOLD = 0.5
+REST_YAW_DELTA_THRESHOLD = 1.0
+
 
 @dataclass(slots=True)
 class SensorSample:
@@ -100,16 +104,34 @@ class SensorSample:
 
     def is_resting(
         self,
+        previous_sample: "SensorSample" | None = None,
         roll_threshold: float = REST_ROLL_THRESHOLD,
         pitch_threshold: float = REST_PITCH_THRESHOLD,
         yaw_threshold: float = REST_YAW_THRESHOLD,
+        roll_delta_threshold: float = REST_ROLL_DELTA_THRESHOLD,
+        pitch_delta_threshold: float = REST_PITCH_DELTA_THRESHOLD,
+        yaw_delta_threshold: float = REST_YAW_DELTA_THRESHOLD,
     ) -> bool:
         """Return ``True`` when the robot is within the resting orientation band."""
 
+        roll_rest = abs(self.calibrated_roll) <= roll_threshold
+        pitch_rest = abs(self.calibrated_pitch) <= pitch_threshold
+        yaw_rest = abs(self.calibrated_yaw) <= yaw_threshold
+
+        if not (roll_rest and pitch_rest and yaw_rest):
+            return False
+
+        if previous_sample is None:
+            return True
+
+        roll_delta = abs(self.calibrated_roll - previous_sample.calibrated_roll)
+        pitch_delta = abs(self.calibrated_pitch - previous_sample.calibrated_pitch)
+        yaw_delta = abs(_wrap_angle(self.calibrated_yaw - previous_sample.calibrated_yaw))
+
         return (
-            abs(self.calibrated_roll) <= roll_threshold
-            and abs(self.calibrated_pitch) <= pitch_threshold
-            and abs(self.calibrated_yaw) <= yaw_threshold
+            roll_delta <= roll_delta_threshold
+            and pitch_delta <= pitch_delta_threshold
+            and yaw_delta <= yaw_delta_threshold
         )
 
 
