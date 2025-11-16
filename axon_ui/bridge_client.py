@@ -23,6 +23,7 @@ class SerialBridgeConnection(QObject):
         self._socket.errorOccurred.connect(self._handle_error)
         self._socket.stateChanged.connect(self._handle_state_changed)
         self._buffer = ""
+        self._last_plain_payload: str | None = None
 
     # ------------------------------------------------------------------
     # Connection helpers
@@ -82,6 +83,9 @@ class SerialBridgeConnection(QObject):
             return
         if line.startswith("telemetry "):
             payload = line.split(" ", 1)[1]
+            if self._last_plain_payload != payload:
+                self.lineReceived.emit(payload)
+            self._last_plain_payload = None
             try:
                 data = json.loads(payload)
             except json.JSONDecodeError:
@@ -89,6 +93,7 @@ class SerialBridgeConnection(QObject):
                 return
             self.telemetryReceived.emit(data)
             return
+        self._last_plain_payload = line
         self.lineReceived.emit(line)
 
     # ------------------------------------------------------------------

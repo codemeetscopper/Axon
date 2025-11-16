@@ -30,6 +30,7 @@ class RobotLinkPanel(QWidget):
     """Allow the simulator to talk to the robot over the serial bridge."""
 
     remoteControlChanged = Signal(bool)
+    linkStateChanged = Signal(bool, str, int)
 
     def __init__(
         self,
@@ -46,6 +47,8 @@ class RobotLinkPanel(QWidget):
         self._controller.remoteActiveChanged.connect(self._handle_remote_active)
         self._controller.lineReceived.connect(self._append_bridge_line)
         self._controller.errorOccurred.connect(self._handle_error)
+        self._last_host = default_host or DEFAULT_BRIDGE_HOST
+        self._last_port = default_port or DEFAULT_BRIDGE_PORT
 
         self._host_edit = QLineEdit(self)
         self._port_spin = QSpinBox(self)
@@ -141,6 +144,8 @@ class RobotLinkPanel(QWidget):
 
         host = self._host_edit.text().strip() or DEFAULT_BRIDGE_HOST
         port = int(self._port_spin.value())
+        self._last_host = host
+        self._last_port = port
         self._append_message(f"Connecting to {host}:{port}")
         self._controller.connect_to(host, port)
 
@@ -182,6 +187,10 @@ class RobotLinkPanel(QWidget):
             self._append_message("Bridge connected")
         else:
             self._append_message("Bridge inactive")
+        self._emit_link_state(active)
+
+    def _emit_link_state(self, active: bool) -> None:
+        self.linkStateChanged.emit(active, self._last_host, self._last_port)
 
     def _append_message(self, text: str) -> None:
         self._log_view.appendPlainText(text)
