@@ -39,6 +39,7 @@ class ControlPanel(QWidget):
         self._cycle_timer = QTimer(self)
         self._cycle_timer.setInterval(2600)
         self._cycle_timer.timeout.connect(self._advance_cycle)
+        self._simulation_enabled = True
         self._telemetry_values: dict[str, float] = {
             "message_type": 1001.0,
             "left_speed": 0.0,
@@ -53,6 +54,34 @@ class ControlPanel(QWidget):
         self._telemetry_sliders: dict[str, QSlider] = {}
         self._build_ui()
         self._push_telemetry()
+
+    def set_simulation_enabled(self, enabled: bool) -> None:
+        """Enable or disable the manual simulation controls."""
+
+        if self._simulation_enabled == enabled:
+            return
+        self._simulation_enabled = enabled
+        super().setEnabled(enabled)
+        if not enabled:
+            self._cycle_timer.stop()
+        elif self.cycle_checkbox.isChecked():
+            self._cycle_timer.start()
+
+    def apply_simulation_state(self) -> None:
+        """Reapply the current slider/emotion settings to the UI."""
+
+        if not self._simulation_enabled:
+            return
+        self.face.set_emotion(self.emotion_combo.currentText())
+        self.face.set_orientation(
+            yaw=float(self._telemetry_values["yaw"]),
+            pitch=float(self._telemetry_values["pitch"]),
+            roll=float(self._telemetry_values["roll"]),
+        )
+        self._push_telemetry(force=True)
+
+    def is_simulation_enabled(self) -> bool:
+        return self._simulation_enabled
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -180,12 +209,16 @@ class ControlPanel(QWidget):
             label.setText(text)
 
     def _update_orientation(self, axis: str, value: int) -> None:
+        if not self._simulation_enabled:
+            return
         self.face.set_orientation(**{axis: float(value)})
         self._telemetry_values[axis] = float(value)
         self._set_value_label(f"value_{axis}", f"{value}°")
         self._push_telemetry()
 
     def _reset_orientation(self) -> None:
+        if not self._simulation_enabled:
+            return
         self.face.set_orientation(yaw=0.0, pitch=0.0, roll=0.0)
         for axis, slider in self.sliders.items():
             slider.blockSignals(True)
@@ -196,6 +229,8 @@ class ControlPanel(QWidget):
         self._push_telemetry()
 
     def _random_emotion(self) -> None:
+        if not self._simulation_enabled:
+            return
         emotions = list(self.face.available_emotions())
         if not emotions:
             return
@@ -263,12 +298,16 @@ class ControlPanel(QWidget):
         formatter: Callable[[float], str],
         value: int,
     ) -> None:
+        if not self._simulation_enabled:
+            return
         actual = float(value) * scale
         self._telemetry_values[key] = actual
         self._set_value_label(f"telemetry_value_{key}", formatter(actual))
         self._push_telemetry()
 
-    def _push_telemetry(self) -> None:
+    def _push_telemetry(self, *, force: bool = False) -> None:
+        if not self._simulation_enabled and not force:
+            return
         sample = SensorSample(
             message_type=int(self._telemetry_values["message_type"]),
             left_speed=float(self._telemetry_values["left_speed"]),

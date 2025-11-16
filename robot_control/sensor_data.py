@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
 
 ROLL_CALIBRATION = 5.420720526107142
@@ -68,15 +68,35 @@ class SensorSample:
             payload = payload.split("Received:", 1)[1].strip()
 
         data = json.loads(payload)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "SensorSample":
+        """Create a sample from a mapping.
+
+        The TCP bridge uses human-readable keys such as ``"message_type"`` while the robot
+        firmware typically emits terse single-letter keys (``"T"``, ``"L"`` ...).  This helper
+        accepts either naming scheme so the simulator can ingest telemetry frames from both
+        sources interchangeably.
+        """
+
+        def _lookup(*names: str, default: float | int = 0.0, required: bool = False) -> float | int:
+            for name in names:
+                if name in payload:
+                    return payload[name]
+            if required:
+                raise KeyError(f"Missing required telemetry field: {names[0]}")
+            return default
+
         return cls(
-            message_type=int(data["T"]),
-            left_speed=float(data.get("L", 0.0)),
-            right_speed=float(data.get("R", 0.0)),
-            roll=float(data.get("r", 0.0)),
-            pitch=float(data.get("p", 0.0)),
-            yaw=float(data.get("y", 0.0)),
-            temperature_c=float(data.get("temp", 0.0)),
-            voltage_v=float(data.get("v", 0.0)),
+            message_type=int(_lookup("message_type", "T", required=True)),
+            left_speed=float(_lookup("left_speed", "L")),
+            right_speed=float(_lookup("right_speed", "R")),
+            roll=float(_lookup("roll", "r")),
+            pitch=float(_lookup("pitch", "p")),
+            yaw=float(_lookup("yaw", "y")),
+            temperature_c=float(_lookup("temperature_c", "temp")),
+            voltage_v=float(_lookup("voltage_v", "v")),
         )
 
     def to_orientation(self) -> Dict[str, float]:

@@ -33,6 +33,7 @@ class SerialBridgeServer:
         self._client_threads: set[threading.Thread] = set()
         self._client_sockets: set[socket.socket] = set()
         self._clients_lock = threading.Lock()
+        self._reader.add_line_consumer(self.publish_serial_line)
 
     def start(self) -> None:
         if self._server_thread and self._server_thread.is_alive():
@@ -70,13 +71,13 @@ class SerialBridgeServer:
     def publish_sample(self, sample: SensorSample) -> None:
         payload = json.dumps(sample.as_dict())
         frame = f"telemetry {payload}\n".encode(self._config.encoding)
-        with self._clients_lock:
-            clients = list(self._client_sockets)
-        for conn in clients:
-            try:
-                conn.sendall(frame)
-            except OSError:
-                self._drop_client(conn)
+        self._broadcast(frame)
+
+    def publish_serial_line(self, line: str) -> None:
+        """Forward a raw serial line to every connected client."""
+
+        frame = f"{line}\n".encode(self._config.encoding, errors="ignore")
+        self._broadcast(frame)
 
     def _serve(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -147,6 +148,15 @@ class SerialBridgeServer:
             conn.close()
         except OSError:
             pass
+
+    def _broadcast(self, frame: bytes) -> None:
+        with self._clients_lock:
+            clients = list(self._client_sockets)
+        for conn in clients:
+            try:
+                conn.sendall(frame)
+            except OSError:
+                self._drop_client(conn)
 
     def _process_command(self, conn: socket.socket, payload: bytes) -> None:
         command = payload.decode(self._config.encoding, errors="ignore").strip()

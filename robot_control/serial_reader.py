@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 import serial
 from serial import SerialException
@@ -27,11 +27,13 @@ class SerialReader:
             raise RuntimeError(f"Unable to open serial port {port!r}: {exc}") from exc
 
         self._lock = threading.Lock()
+        self._listeners_lock = threading.Lock()
         self._latest: Optional[SensorSample] = None
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._closed = False
         self._error: Optional[Exception] = None
+        self._line_consumers: list[Callable[[str], None]] = []
 
     def start(self) -> None:
         """Start draining telemetry from the serial port on a dedicated thread."""
@@ -78,6 +80,19 @@ class SerialReader:
     def has_error(self) -> bool:
         return self._error is not None
 
+    def add_line_consumer(self, consumer: Callable[[str], None]) -> None:
+        """Register *consumer* to receive every decoded serial line."""
+
+        with self._listeners_lock:
+            self._line_consumers.append(consumer)
+
+    def remove_line_consumer(self, consumer: Callable[[str], None]) -> None:
+        """Remove a previously registered line consumer."""
+
+        with self._listeners_lock:
+            if consumer in self._line_consumers:
+                self._line_consumers.remove(consumer)
+
     def _run(self) -> None:
         try:
             while not self._stop_event.is_set():
@@ -100,6 +115,8 @@ class SerialReader:
                 if not text:
                     continue
 
+                self._dispatch_line(text)
+
                 try:
                     sample = SensorSample.from_json(text)
                 except (ValueError, KeyError) as exc:
@@ -117,6 +134,15 @@ class SerialReader:
             if self._error is not None and not self._closed:
                 self._close_serial()
                 self._closed = True
+
+    def _dispatch_line(self, line: str) -> None:
+        with self._listeners_lock:
+            listeners = list(self._line_consumers)
+        for consumer in listeners:
+            try:
+                consumer(line)
+            except Exception:  # pragma: no cover - diagnostic aid
+                LOGGER.exception("Serial line consumer raised an exception")
 
     def _close_serial(self) -> None:
         try:
