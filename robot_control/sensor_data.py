@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping
+from typing import Any, Dict
 
 
 ROLL_CALIBRATION = 5.420720526107142
@@ -88,21 +88,6 @@ class SensorSample:
             # Invert roll so that the face leans in the intuitive direction.
             "roll": _apply_deadband(-self.calibrated_roll, ROLL_DEADBAND),
         }
-
-    @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "SensorSample":
-        """Create a sample from a dict produced by :meth:`as_dict`."""
-
-        return cls(
-            message_type=int(payload.get("message_type", payload.get("T", 0))),
-            left_speed=float(payload.get("left_speed", payload.get("L", 0.0))),
-            right_speed=float(payload.get("right_speed", payload.get("R", 0.0))),
-            roll=float(payload.get("roll", payload.get("r", 0.0))),
-            pitch=float(payload.get("pitch", payload.get("p", 0.0))),
-            yaw=float(payload.get("yaw", payload.get("y", 0.0))),
-            temperature_c=float(payload.get("temperature_c", payload.get("temp", 0.0))),
-            voltage_v=float(payload.get("voltage_v", payload.get("v", 0.0))),
-        )
 
     @property
     def calibrated_roll(self) -> float:

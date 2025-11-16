@@ -48,16 +48,8 @@ flowchart LR
 - **SerialReader** continuously polls the microcontroller over UART (or a mock
   publisher in the simulator) and produces `SensorSample` objects.
 - **SerialCommandServer** mirrors the UART link over TCP so remote tools can
-  issue manual commands and watch the live telemetry stream. The included
-  PySide6 `serial_command_client.py` application provides a dashboard UI for
-  driving that bridge from another computer.
-- **RemoteBridgeController** (in `robot_control.remote_bridge`) embeds the same
-  TCP client inside the simulator so a "Robot link" card can hand control of the
-  face/telemetry overlays to live hardware whenever a connection to
-  `192.168.1.169:8765` is established.
-- **SerialBridgeConnection** (in `axon_ui.bridge_client`) is the reusable Qt
-  socket helper that powers both the simulator's remote card and the standalone
-  bridge client.
+  issue manual commands. The included `serial_command_client.py` script offers a
+  convenient CLI for driving that bridge from another computer.
 - **GyroCalibrator** watches short-term IMU stability windows and learns the
   baseline offsets that should be subtracted before feeding gyro data into the
   face controller.
@@ -78,7 +70,7 @@ flowchart LR
 
 | Environment | Entry point | Purpose |
 |-------------|-------------|---------|
-| Simulator   | `simulation_main.py` | Generates pseudo-random `SensorSample` data, exposes a rich control surface for designers, and now includes a "Robot link" card that can stream telemetry from the hardware bridge at `192.168.1.169`. |
+| Simulator   | `simulation_main.py` | Generates pseudo-random `SensorSample` data and exposes a rich control surface for designers to test the face UI without hardware. |
 | Robot runtime | `robot_main.py` | Connects to the UART bridge, auto-calibrates gyro offsets, and mirrors the telemetry/info overlays inside a fullscreen kiosk experience. |
 
 Both entry points share the same widget hierarchy and overlays. Only the sensor

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import socket
 import threading
 from dataclasses import dataclass
 from typing import Optional
 
-from .sensor_data import SensorSample
 from .serial_reader import SerialReader
 
 LOGGER = logging.getLogger(__name__)
@@ -38,9 +36,6 @@ class SerialCommandServer:
         self._thread: Optional[threading.Thread] = None
         self._socket: Optional[socket.socket] = None
         self._clients: set[threading.Thread] = set()
-        self._client_sockets: set[socket.socket] = set()
-        self._client_lock = threading.Lock()
-        self._listener_registered = False
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -48,9 +43,6 @@ class SerialCommandServer:
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._serve, name="SerialCommandServer", daemon=True)
         self._thread.start()
-        if not self._listener_registered:
-            self._reader.add_listener(self._handle_sample)
-            self._listener_registered = True
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -66,16 +58,6 @@ class SerialCommandServer:
         self._thread = None
         self._socket = None
         self._clients.clear()
-        with self._client_lock:
-            for conn in list(self._client_sockets):
-                try:
-                    conn.close()
-                except OSError:
-                    pass
-            self._client_sockets.clear()
-        if self._listener_registered:
-            self._reader.remove_listener(self._handle_sample)
-            self._listener_registered = False
 
     def _serve(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -112,8 +94,6 @@ class SerialCommandServer:
     def _handle_client(self, conn: socket.socket, address: tuple[str, int]) -> None:
         LOGGER.info("Client connected from %s:%s", *address)
         buffer = b""
-        with self._client_lock:
-            self._client_sockets.add(conn)
         try:
             conn.sendall(self._config.welcome_message.encode(self._config.encoding))
             conn.settimeout(1.0)
@@ -137,8 +117,6 @@ class SerialCommandServer:
                 pass
             LOGGER.info("Client disconnected from %s:%s", *address)
             self._clients.discard(threading.current_thread())
-            with self._client_lock:
-                self._client_sockets.discard(conn)
 
     def _process_command(self, conn: socket.socket, payload: bytes) -> None:
         command = payload.decode(self._config.encoding, errors="ignore").strip()
@@ -153,24 +131,3 @@ class SerialCommandServer:
             conn.sendall(response)
         except OSError:
             pass
-
-    def _handle_sample(self, sample: SensorSample, raw_payload: str) -> None:
-        try:
-            data = sample.as_dict()
-            data["raw"] = raw_payload
-            payload = json.dumps(data, separators=(",", ":"))
-        except Exception:
-            LOGGER.debug("Failed to encode telemetry for broadcast", exc_info=True)
-            return
-        self._broadcast(f"telemetry {payload}\n")
-
-    def _broadcast(self, message: str) -> None:
-        data = message.encode(self._config.encoding, errors="ignore")
-        with self._client_lock:
-            sockets = list(self._client_sockets)
-        for conn in sockets:
-            try:
-                conn.sendall(data)
-            except OSError:
-                with self._client_lock:
-                    self._client_sockets.discard(conn)

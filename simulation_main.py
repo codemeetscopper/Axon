@@ -5,8 +5,7 @@ import sys
 from functools import partial
 from typing import Callable, Sequence
 
-from PySide6.QtCore import QSize, Qt, QTimer, QWIDGETSIZE_MAX
-from PySide6.QtNetwork import QAbstractSocket
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -15,11 +14,9 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QSlider,
     QSpacerItem,
-    QSpinBox,
     QSizePolicy,
     QStackedLayout,
     QVBoxLayout,
@@ -27,11 +24,6 @@ from PySide6.QtWidgets import (
 )
 
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel, apply_dark_palette
-from robot_control.remote_bridge import (
-    DEFAULT_BRIDGE_HOST,
-    DEFAULT_BRIDGE_PORT,
-    RemoteBridgeController,
-)
 from robot_control.sensor_data import SensorSample
 
 # Backwards compatibility for external imports expecting the old helper name.
@@ -214,7 +206,7 @@ class FaceTelemetryDisplay(QWidget):
     def _set_panel_width(panel: QWidget, width: int) -> None:
         width = max(0, int(width))
         panel.setMinimumWidth(width)
-        panel.setMaximumWidth(max(width, QWIDGETSIZE_MAX))
+        panel.setMaximumWidth(width)
 
     @staticmethod
     def _panel_width(panel: QWidget) -> int:
@@ -226,115 +218,16 @@ class FaceTelemetryDisplay(QWidget):
         return max(0, hint.width())
 
 
-class RemoteBridgeWidget(QFrame):
-    """Small utility panel that connects to the real robot."""
-
-    def __init__(self, bridge: RemoteBridgeController, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._bridge = bridge
-        self.setObjectName("remoteBridgePanel")
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet(
-            "#remoteBridgePanel {"
-            "  background-color: rgba(4, 9, 20, 0.72);"
-            "  border: 1px solid rgba(255, 255, 255, 0.08);"
-            "  border-radius: 12px;"
-            "}"
-        )
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
-
-        title = QLabel("Robot link")
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
-        layout.addWidget(title)
-
-        row = QHBoxLayout()
-        row.setSpacing(6)
-        self._host_input = QLineEdit(DEFAULT_BRIDGE_HOST)
-        self._host_input.setPlaceholderText("Robot IP address")
-        self._host_input.setClearButtonEnabled(True)
-        self._port_input = QSpinBox()
-        self._port_input.setRange(1, 65535)
-        self._port_input.setValue(DEFAULT_BRIDGE_PORT)
-        self._connect_button = QPushButton("Connect")
-        self._connect_button.clicked.connect(self._toggle_connection)
-        self._status_label = QLabel("Offline")
-        self._status_label.setStyleSheet("color: #f94144; font-weight: 600;")
-
-        row.addWidget(QLabel("Host:"))
-        row.addWidget(self._host_input, 2)
-        row.addWidget(QLabel("Port:"))
-        row.addWidget(self._port_input)
-        row.addWidget(self._connect_button)
-        row.addWidget(self._status_label)
-        layout.addLayout(row)
-
-        self._error_label = QLabel("")
-        self._error_label.setStyleSheet("color: #f9c74f; font-size: 12px;")
-        self._error_label.setWordWrap(True)
-        layout.addWidget(self._error_label)
-
-        self._bridge.connectionStateChanged.connect(self._handle_state_change)
-        self._bridge.errorOccurred.connect(self._show_error)
-        self._update_controls()
-
-    def _toggle_connection(self) -> None:
-        state = self._bridge.state()
-        if state in (
-            QAbstractSocket.SocketState.ConnectedState,
-            QAbstractSocket.SocketState.ConnectingState,
-        ):
-            self._bridge.disconnect()
-            return
-        host = self._host_input.text().strip() or DEFAULT_BRIDGE_HOST
-        port = int(self._port_input.value())
-        self._error_label.clear()
-        self._bridge.connect_to(host, port)
-        self._update_controls()
-
-    def _handle_state_change(self, state: QAbstractSocket.SocketState) -> None:
-        if state == QAbstractSocket.SocketState.ConnectedState:
-            text, color = "Connected", "#2dd881"
-            button = "Disconnect"
-        elif state == QAbstractSocket.SocketState.ConnectingState:
-            text, color = "Connecting...", "#ffd166"
-            button = "Cancel"
-        else:
-            text, color = "Offline", "#f94144"
-            button = "Connect"
-        self._status_label.setText(text)
-        self._status_label.setStyleSheet(f"color: {color}; font-weight: 600;")
-        self._connect_button.setText(button)
-        if state != QAbstractSocket.SocketState.UnconnectedState:
-            self._error_label.clear()
-        self._update_controls()
-
-    def _show_error(self, message: str) -> None:
-        self._error_label.setText(message)
-
-    def _update_controls(self) -> None:
-        state = self._bridge.state()
-        busy = state in (
-            QAbstractSocket.SocketState.ConnectedState,
-            QAbstractSocket.SocketState.ConnectingState,
-        )
-        self._host_input.setEnabled(not busy)
-        self._port_input.setEnabled(not busy)
 class ControlPanel(QWidget):
     def __init__(
         self,
         face: RoboticFaceWidget,
         telemetry: TelemetryPanel,
-        *,
-        remote_bridge: RemoteBridgeController | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.face = face
         self.telemetry = telemetry
-        self._remote_bridge = remote_bridge
-        self._remote_active = False
         self._cycle_timer = QTimer(self)
         self._cycle_timer.setInterval(2600)
         self._cycle_timer.timeout.connect(self._advance_cycle)
@@ -350,20 +243,12 @@ class ControlPanel(QWidget):
         }
         self.sliders: dict[str, QSlider] = {}
         self._telemetry_sliders: dict[str, QSlider] = {}
-        self._reset_button: QPushButton | None = None
-        self._shuffle_button: QPushButton | None = None
         self._build_ui()
         self._push_telemetry()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setSpacing(14)
-
-        if self._remote_bridge is not None:
-            remote_panel = RemoteBridgeWidget(self._remote_bridge)
-            layout.addWidget(remote_panel)
-            layout.addSpacing(12)
-            self._remote_bridge.remoteActiveChanged.connect(self._handle_remote_active)
 
         title = QLabel("Emotion")
         title.setStyleSheet("font-size: 18px; font-weight: 600; letter-spacing: 1px;")
@@ -414,12 +299,10 @@ class ControlPanel(QWidget):
         reset_btn = QPushButton("Reset Orientation")
         reset_btn.clicked.connect(self._reset_orientation)
         layout.addWidget(reset_btn)
-        self._reset_button = reset_btn
 
         shuffle_btn = QPushButton("Surprise Me ✨")
         shuffle_btn.clicked.connect(self._random_emotion)
         layout.addWidget(shuffle_btn)
-        self._shuffle_button = shuffle_btn
 
         layout.addSpacing(18)
 
@@ -489,16 +372,12 @@ class ControlPanel(QWidget):
             label.setText(text)
 
     def _update_orientation(self, axis: str, value: int) -> None:
-        if self._remote_active:
-            return
         self.face.set_orientation(**{axis: float(value)})
         self._telemetry_values[axis] = float(value)
         self._set_value_label(f"value_{axis}", f"{value}°")
         self._push_telemetry()
 
     def _reset_orientation(self) -> None:
-        if self._remote_active:
-            return
         self.face.set_orientation(yaw=0.0, pitch=0.0, roll=0.0)
         for axis, slider in self.sliders.items():
             slider.blockSignals(True)
@@ -509,8 +388,6 @@ class ControlPanel(QWidget):
         self._push_telemetry()
 
     def _random_emotion(self) -> None:
-        if self._remote_active:
-            return
         emotions = list(self.face.available_emotions())
         if not emotions:
             return
@@ -520,19 +397,12 @@ class ControlPanel(QWidget):
         self.emotion_combo.setCurrentText(next_emotion)
 
     def _toggle_cycle(self, enabled: bool) -> None:
-        if self._remote_active:
-            self.cycle_checkbox.blockSignals(True)
-            self.cycle_checkbox.setChecked(False)
-            self.cycle_checkbox.blockSignals(False)
-            return
         if enabled and len(self.face.available_emotions()) > 1:
             self._cycle_timer.start()
         else:
             self._cycle_timer.stop()
 
     def _advance_cycle(self) -> None:
-        if self._remote_active:
-            return
         emotions = list(self.face.available_emotions())
         if len(emotions) < 2:
             return
@@ -585,16 +455,12 @@ class ControlPanel(QWidget):
         formatter: Callable[[float], str],
         value: int,
     ) -> None:
-        if self._remote_active:
-            return
         actual = float(value) * scale
         self._telemetry_values[key] = actual
         self._set_value_label(f"telemetry_value_{key}", formatter(actual))
         self._push_telemetry()
 
     def _push_telemetry(self) -> None:
-        if self._remote_active:
-            return
         sample = SensorSample(
             message_type=int(self._telemetry_values["message_type"]),
             left_speed=float(self._telemetry_values["left_speed"]),
@@ -606,32 +472,6 @@ class ControlPanel(QWidget):
             voltage_v=float(self._telemetry_values["voltage_v"]),
         )
         self.telemetry.update_sample(sample)
-
-    def _handle_remote_active(self, active: bool) -> None:
-        if self._remote_active == active:
-            return
-        self._remote_active = active
-        if active:
-            self._set_manual_controls_enabled(False)
-            self._cycle_timer.stop()
-            self.cycle_checkbox.blockSignals(True)
-            self.cycle_checkbox.setChecked(False)
-            self.cycle_checkbox.blockSignals(False)
-        else:
-            self._set_manual_controls_enabled(True)
-            self._push_telemetry()
-
-    def _set_manual_controls_enabled(self, enabled: bool) -> None:
-        self.emotion_combo.setEnabled(enabled)
-        self.cycle_checkbox.setEnabled(enabled)
-        if self._reset_button is not None:
-            self._reset_button.setEnabled(enabled)
-        if self._shuffle_button is not None:
-            self._shuffle_button.setEnabled(enabled)
-        for slider in self.sliders.values():
-            slider.setEnabled(enabled)
-        for slider in self._telemetry_sliders.values():
-            slider.setEnabled(enabled)
 
 
 class MainWindow(QWidget):
@@ -649,12 +489,11 @@ class MainWindow(QWidget):
         self.telemetry = TelemetryPanel()
         self.info_panel = InfoPanel()
         self.info_panel.displayModeToggleRequested.connect(self._toggle_window_mode)
-        self.remote_bridge = RemoteBridgeController(self.face, self.telemetry)
 
         display = FaceTelemetryDisplay(self.face, (self.info_panel, self.telemetry))
         layout.addWidget(display, 0, Qt.AlignmentFlag.AlignTop)
 
-        panel = ControlPanel(self.face, self.telemetry, remote_bridge=self.remote_bridge)
+        panel = ControlPanel(self.face, self.telemetry)
         panel.setFixedWidth(280)
         panel.setObjectName("controlPanel")
         layout.addWidget(panel, 1)
