@@ -4,15 +4,14 @@ import logging
 import signal
 import sys
 import time
-from typing import Optional, Sequence
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication
 
+from axon_ros.runtime import RobotMainWindow, RobotRuntime
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
 from robot_control import EmotionPolicy, FaceController, SerialReader
-from robot_control.gyro_calibrator import GyroCalibrator
-from simulation_main import FaceTelemetryDisplay
+from robot_control.serial_bridge_config import SerialBridgeConfig
+from robot_control.serial_bridge_server import SerialBridgeServer
 
 try:  # Reuse the palette from the interactive demo when available.
     from axon_ui import apply_dark_palette as apply_palette
@@ -21,103 +20,12 @@ except Exception:  # pragma: no cover - best effort reuse
 
 LOGGER = logging.getLogger(__name__)
 
-
-class RobotMainWindow(QWidget):
-    def __init__(
-        self,
-        face: RoboticFaceWidget,
-        overlays: Sequence[QWidget] | QWidget,
-    ) -> None:
-        super().__init__()
-        self.setWindowTitle("Axon Runtime")
-        self._display = FaceTelemetryDisplay(
-            face,
-            overlays,
-            parent=self,
-            fixed_size=None,
-        )
-        self._register_info_controls(overlays)
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(self._display)
-
-    def _register_info_controls(self, overlays: Sequence[QWidget] | QWidget) -> None:
-        widgets: Sequence[QWidget]
-        if isinstance(overlays, Sequence):
-            widgets = overlays
-        else:
-            widgets = (overlays,)
-        for widget in widgets:
-            if isinstance(widget, InfoPanel):
-                widget.displayModeToggleRequested.connect(self._toggle_window_mode)
-
-    def _toggle_window_mode(self) -> None:
-        if self.isFullScreen():
-            self.showNormal()
-        else:
-            self.showFullScreen()
-
-
-class RobotRuntime(QWidget):
-    """Manage the serial polling loop inside the Qt event loop."""
-
-    def __init__(
-        self,
-        reader: SerialReader,
-        controller: FaceController,
-        telemetry: TelemetryPanel,
-        poll_interval_ms: int = 40,
-        parent: Optional[QWidget] = None,
-        calibrator: GyroCalibrator | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._reader = reader
-        self._controller = controller
-        self._telemetry = telemetry
-        self._calibrator = calibrator or GyroCalibrator()
-        self._timer = QTimer(self)
-        self._timer.setInterval(poll_interval_ms)
-        self._timer.timeout.connect(self._poll)
-        self._missed_cycles = 0
-        self._running = False
-
-    def start(self) -> None:
-        if self._running:
-            return
-        self._running = True
-        self._reader.start()
-        self._timer.start()
-
-    def stop(self) -> None:
-        if not self._running:
-            self._reader.stop()
-            return
-        self._running = False
-        self._timer.stop()
-        self._reader.stop()
-
-    def _poll(self) -> None:
-        sample = self._reader.pop_latest()
-        if sample is None:
-            self._missed_cycles += 1
-            if self._missed_cycles >= 10:
-                self._telemetry.set_streaming(False)
-            return
-
-        self._missed_cycles = 0
-        self._calibrator.observe(sample)
-        self._controller.apply_sample(sample)
-        self._telemetry.update_sample(sample)
-
-
 DEFAULT_SERIAL_PORT = "/dev/ttyAMA0"
 DEFAULT_BAUDRATE = 115200
 DEFAULT_POLL_INTERVAL_MS = 40
 DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_BRIDGE_HOST = "0.0.0.0"
+DEFAULT_BRIDGE_PORT = 8765
 
 
 def _configure_logging(level: str) -> None:
@@ -138,6 +46,11 @@ def main() -> int:
         LOGGER.error("%s", exc)
         return 1
 
+    bridge = SerialBridgeServer(
+        reader,
+        config=SerialBridgeConfig(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_BRIDGE_PORT),
+    )
+
     app = QApplication(sys.argv)
     app.setApplicationDisplayName("Axon Runtime")
     app.setStyle("Fusion")
@@ -156,6 +69,7 @@ def main() -> int:
         controller,
         telemetry,
         poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
+        bridge=bridge,
     )
     app.aboutToQuit.connect(runtime.stop)
 

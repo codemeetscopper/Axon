@@ -31,6 +31,35 @@ python simulation_main.py
 
 Use the control panel to experiment with different emotions and orientation values.
 
+### ROS2-inspired runtime layout
+
+The runtime has been reorganized to mirror a ROS2 workspace. The new `axon_ros`
+package exposes dedicated "nodes" for the simulator (`SimulatorMainWindow`), the
+robot runtime (`RobotRuntime`/`RobotMainWindow`), and the shared UI overlay
+(`FaceTelemetryDisplay`). Each class lives in its own module so individual nodes
+can be composed from launch files or standalone scripts.
+
+### Robot runtime + serial bridge
+
+```bash
+python robot_main.py
+```
+
+`robot_main.py` remains the entry-point on the robot. It now boots a
+`SerialBridgeServer` that streams telemetry and forwards commands over TCP so a
+laptop can drive the UI remotely. By default the bridge listens on
+`0.0.0.0:8765`.
+
+### Remote PySide6 UI (laptop)
+
+```bash
+python remote_ui_main.py --host 192.168.1.169 --port 8765
+```
+
+The remote UI connects to the robot's serial bridge (default IP
+`192.168.1.169`) and mirrors the telemetry overlay plus face animations in a
+windowed experience.
+
 ## Integrating the Widget
 
 Import and instantiate `RoboticFaceWidget` in your PySide6 project:

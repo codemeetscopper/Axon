@@ -8,6 +8,7 @@ import socket
 import sys
 from typing import Iterable
 
+DEFAULT_HOST = "192.168.1.169"
 DEFAULT_PORT = 8765
 
 
@@ -33,7 +34,7 @@ def _interactive_loop(sock: socket.socket) -> None:
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("commands", nargs="*", help="Commands to send once connected")
-    parser.add_argument("--host", default="127.0.0.1", help="Hostname or IP of the robot")
+    parser.add_argument("--host", default=DEFAULT_HOST, help="Hostname or IP of the robot")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="TCP port exposed by the robot")
     args = parser.parse_args(list(argv) if argv is not None else None)
 

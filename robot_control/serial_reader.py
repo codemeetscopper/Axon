@@ -64,6 +64,17 @@ class SerialReader:
             self._latest = None
         return sample
 
+    def send_command(self, command: str) -> None:
+        """Send a raw command over the serial transport."""
+
+        if self._closed:
+            raise RuntimeError("Serial connection is closed")
+        payload = command.rstrip("\n") + "\n"
+        data = payload.encode("utf-8")
+        with self._lock:
+            self._serial.write(data)
+            self._serial.flush()
+
     def has_error(self) -> bool:
         return self._error is not None
 

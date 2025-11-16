@@ -6,9 +6,9 @@
 - Provide operators with immediate status (connection, IP, Wi-Fi, fullscreen).
 
 ## Slide 2 — Key Modules
-- `simulation_main.FaceTelemetryDisplay`: composite widget that layers the face and overlay dock.
-- `axon_ui.telemetry.TelemetryPanel`: raw sensor viewer + status icon.
-- `axon_ui.telemetry.InfoPanel`: metadata card with fullscreen toggle signal.
+- `axon_ros.ui.face_telemetry_display.FaceTelemetryDisplay`: composite widget that layers the face and overlay dock.
+- `axon_ui.telemetry_panel.TelemetryPanel`: raw sensor viewer + status icon.
+- `axon_ui.info_panel.InfoPanel`: metadata card with fullscreen toggle signal.
 - `robot_control.SerialReader`: pulls `SensorSample` objects from UART.
 - `robot_control.GyroCalibrator`: learns gyro offsets after 3 s of stability.
 - `robot_control.FaceController` + `EmotionPolicy`: converts normalized motion into mouth/eye poses.

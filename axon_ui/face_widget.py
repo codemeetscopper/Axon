@@ -2,27 +2,13 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QTimer, QVariantAnimation, Qt
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
-
-@dataclass
-class EmotionPreset:
-    name: str
-    eye_openness: float
-    eye_curve: float
-    brow_raise: float
-    brow_tilt: float
-    mouth_curve: float
-    mouth_open: float
-    mouth_width: float
-    mouth_height: float
-    iris_size: float
-    accent_color: Tuple[int, int, int]
+from axon_ui.emotion_preset import EmotionPreset
 
 
 class RoboticFaceWidget(QWidget):
