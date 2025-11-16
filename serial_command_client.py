@@ -190,7 +190,7 @@ class SerialBridgeClient(QMainWindow):
         if self._socket.state() in (QAbstractSocket.SocketState.ConnectingState, QAbstractSocket.SocketState.ConnectedState):
             self._socket.abort()
             return
-        host = self._host_input.text().strip() or "127.0.0.1"
+        host = self._host_input.text().strip() or "192.168.1.169"
         port = int(self._port_input.value())
         self._append_log(f"Connecting to {host}:{port}...")
         self._socket.connectToHost(host, port)
