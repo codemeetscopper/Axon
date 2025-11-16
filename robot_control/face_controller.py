@@ -23,12 +23,22 @@ class FaceController(QObject):
         super().__init__(parent)
         self._face = face
         self._policy = policy or EmotionPolicy()
-        self._current_emotion: str | None = None
-        self._rest_start: float | None = None
+        self._current_emotion: str | None = self._policy.default_emotion
+        self._steady_start: float | None = None
         self._rest_delay = 5.0
         self._sleep_emotion = "sleepy"
         self._sleeping = False
         self._previous_sample: SensorSample | None = None
+        self._initialize_face()
+
+    def _initialize_face(self) -> None:
+        available = tuple(self._face.available_emotions())
+        if self._current_emotion and self._current_emotion in available:
+            self._face.set_emotion(self._current_emotion)
+        elif available:
+            choice = available[0]
+            self._face.set_emotion(choice)
+            self._current_emotion = choice
 
     def apply_sample(self, sample: SensorSample) -> None:
         """Update the face to reflect the latest telemetry sample."""
@@ -37,45 +47,48 @@ class FaceController(QObject):
 
         now = monotonic()
         previous = self._previous_sample
-        resting = sample.is_resting(previous_sample=previous)
-        next_emotion: Optional[str]
+        major_movement = sample.has_major_movement(previous)
+        steady = sample.is_steady(previous)
+        next_emotion: Optional[str] = None
 
-        if resting:
-            if self._rest_start is None:
-                self._rest_start = now
-            if self._sleeping:
-                next_emotion = self._sleep_emotion
-            elif (now - self._rest_start) >= self._rest_delay:
-                next_emotion = self._sleep_emotion
-                self._sleeping = True
-        else:
-            self._rest_start = None
-            if self._sleeping:
-                if previous is None or sample.has_major_movement(previous):
-                    self._sleeping = False
-                    next_emotion = self._policy.default_emotion
-                else:
-                    next_emotion = self._sleep_emotion
-
-        if next_emotion is None and not resting and not self._sleeping:
-            next_emotion = self._policy.choose(sample, current=self._current_emotion)
-            if (
-                next_emotion == self._current_emotion
-                and self._current_emotion not in (
-                    None,
-                    self._policy.default_emotion,
-                    self._policy.alert_emotion,
-                    self._policy.tilt_emotion,
-                )
-            ):
-                next_emotion = self._policy.default_emotion
-        elif next_emotion is None:
-            if self._sleeping:
-                next_emotion = self._sleep_emotion
-            elif self._current_emotion in (self._policy.alert_emotion, self._policy.tilt_emotion):
+        if self._sleeping:
+            if major_movement:
+                self._sleeping = False
+                self._steady_start = None
                 next_emotion = self._policy.default_emotion
             else:
-                next_emotion = self._current_emotion or self._policy.default_emotion
+                next_emotion = self._sleep_emotion
+        else:
+            if major_movement:
+                self._steady_start = None
+            elif steady:
+                if self._steady_start is None:
+                    self._steady_start = now
+                if (now - self._steady_start) >= self._rest_delay:
+                    self._sleeping = True
+                    next_emotion = self._sleep_emotion
+            else:
+                self._steady_start = None
+
+        if next_emotion is None:
+            if self._sleeping:
+                next_emotion = self._sleep_emotion
+            else:
+                next_emotion = self._policy.choose(
+                    sample,
+                    current=self._current_emotion,
+                    previous=previous,
+                )
+                if (
+                    next_emotion == self._current_emotion
+                    and self._current_emotion not in (
+                        None,
+                        self._policy.default_emotion,
+                        self._policy.alert_emotion,
+                        self._policy.tilt_emotion,
+                    )
+                ):
+                    next_emotion = self._policy.default_emotion
 
         self._previous_sample = sample
 

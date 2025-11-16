@@ -27,6 +27,11 @@ REST_ROLL_DELTA_THRESHOLD = 0.5
 REST_PITCH_DELTA_THRESHOLD = 0.5
 REST_YAW_DELTA_THRESHOLD = 1.0
 
+STEADY_ROLL_DELTA_THRESHOLD = 1.5
+STEADY_PITCH_DELTA_THRESHOLD = 1.5
+STEADY_YAW_DELTA_THRESHOLD = 2.5
+STEADY_SPEED_THRESHOLD = 2.5
+
 MAJOR_ROLL_DELTA_THRESHOLD = 6.0
 MAJOR_PITCH_DELTA_THRESHOLD = 6.0
 MAJOR_YAW_DELTA_THRESHOLD = 10.0
@@ -144,6 +149,33 @@ class SensorSample:
             roll_delta <= roll_delta_threshold
             and pitch_delta <= pitch_delta_threshold
             and yaw_delta <= yaw_delta_threshold
+        )
+
+    def is_steady(
+        self,
+        previous_sample: "SensorSample" | None = None,
+        roll_delta_threshold: float = STEADY_ROLL_DELTA_THRESHOLD,
+        pitch_delta_threshold: float = STEADY_PITCH_DELTA_THRESHOLD,
+        yaw_delta_threshold: float = STEADY_YAW_DELTA_THRESHOLD,
+        speed_threshold: float = STEADY_SPEED_THRESHOLD,
+    ) -> bool:
+        """Return ``True`` when orientation and wheel speeds barely change."""
+
+        if previous_sample is None:
+            return False
+
+        roll_delta = abs(self.calibrated_roll - previous_sample.calibrated_roll)
+        pitch_delta = abs(self.calibrated_pitch - previous_sample.calibrated_pitch)
+        yaw_delta = abs(_wrap_angle(self.calibrated_yaw - previous_sample.calibrated_yaw))
+        max_speed = max(abs(self.left_speed), abs(self.right_speed))
+        prev_max_speed = max(abs(previous_sample.left_speed), abs(previous_sample.right_speed))
+
+        return (
+            roll_delta <= roll_delta_threshold
+            and pitch_delta <= pitch_delta_threshold
+            and yaw_delta <= yaw_delta_threshold
+            and max_speed <= speed_threshold
+            and prev_max_speed <= speed_threshold
         )
 
     def has_major_movement(
