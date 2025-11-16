@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional
+from typing import Optional, Protocol
 
 import serial
 from serial import SerialException
@@ -10,6 +10,11 @@ from serial import SerialException
 from .sensor_data import SensorSample
 
 LOGGER = logging.getLogger(__name__)
+
+
+class TelemetryListener(Protocol):
+    def __call__(self, sample: "SensorSample", raw_payload: str) -> None:  # pragma: no cover - Protocol helper
+        ...
 
 
 class SerialReader:
@@ -27,11 +32,13 @@ class SerialReader:
             raise RuntimeError(f"Unable to open serial port {port!r}: {exc}") from exc
 
         self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._latest: Optional[SensorSample] = None
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._closed = False
         self._error: Optional[Exception] = None
+        self._listeners: set[TelemetryListener] = set()
 
     def start(self) -> None:
         """Start draining telemetry from the serial port on a dedicated thread."""
@@ -67,6 +74,32 @@ class SerialReader:
     def has_error(self) -> bool:
         return self._error is not None
 
+    def send_command(self, command: str | bytes) -> None:
+        """Write a command to the serial port in a thread-safe manner."""
+
+        if self._closed:
+            raise RuntimeError("Serial connection is closed")
+
+        if isinstance(command, str):
+            payload = command.encode("utf-8")
+        else:
+            payload = command
+
+        if not payload.endswith(b"\n"):
+            payload += b"\n"
+
+        with self._write_lock:
+            self._serial.write(payload)
+            self._serial.flush()
+
+    def add_listener(self, listener: TelemetryListener) -> None:
+        """Register *listener* to receive every parsed sample."""
+
+        self._listeners.add(listener)
+
+    def remove_listener(self, listener: TelemetryListener) -> None:
+        self._listeners.discard(listener)
+
     def _run(self) -> None:
         try:
             while not self._stop_event.is_set():
@@ -101,11 +134,23 @@ class SerialReader:
 
                 with self._lock:
                     self._latest = sample
+
+                self._notify_listeners(sample, text)
         finally:
             self._stop_event.set()
             if self._error is not None and not self._closed:
                 self._close_serial()
                 self._closed = True
+
+    def _notify_listeners(self, sample: "SensorSample", raw_payload: str) -> None:
+        if not self._listeners:
+            return
+
+        for listener in list(self._listeners):
+            try:
+                listener(sample, raw_payload)
+            except Exception:
+                LOGGER.exception("Serial listener %r failed", listener)
 
     def _close_serial(self) -> None:
         try:

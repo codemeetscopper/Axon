@@ -110,6 +110,15 @@ class TelemetryPanel(CollapsiblePanel):
         ("temperature_c", "temperature", lambda value: f"{value:.1f}°C", "#F72585"),
         ("voltage_v", "voltage", lambda value: f"{value:.2f}V", "#2DD881"),
     )
+    _FIELD_MIN_WIDTHS: dict[str, int] = {
+        "left_speed": 120,
+        "right_speed": 120,
+        "roll": 120,
+        "pitch": 120,
+        "yaw": 120,
+        "temperature_c": 140,
+        "voltage_v": 160,
+    }
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -122,7 +131,7 @@ class TelemetryPanel(CollapsiblePanel):
         self._blink_timer.timeout.connect(self._handle_blink)
         self._streaming = False
         self.setObjectName("telemetryPanel")
-        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._build_ui()
         self.set_streaming(False)
         self._apply_collapsed_state(True)
@@ -166,27 +175,40 @@ class TelemetryPanel(CollapsiblePanel):
         layout.addWidget(self._toggle_button, 0, Qt.AlignmentFlag.AlignRight)
 
         for index, (field, icon_key, formatter, color) in enumerate(self._FIELDS):
+            field_widget = QWidget()
+            min_width = self._FIELD_MIN_WIDTHS.get(field, 120)
+            field_widget.setMinimumWidth(min_width)
+            field_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            field_layout = QHBoxLayout(field_widget)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(6)
+
             icon_label = QLabel()
             icon_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             icon_pixmap = self._build_icon_pixmap(icon_key, color)
             icon_label.setPixmap(icon_pixmap)
             icon_label.setFixedSize(icon_pixmap.size())
-            content_layout.addWidget(icon_label)
+            field_layout.addWidget(icon_label)
 
             value_label = QLabel("--")
-            value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+            value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
             value_label.setStyleSheet(
                 "color: #e8f1ff; font-size: 14px; font-weight: 600;"
             )
-            value_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-            content_layout.addWidget(value_label)
+            min_value_width = max(70, min_width - icon_pixmap.width() - 6)
+            value_label.setMinimumWidth(min_value_width)
+            value_label.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+            field_layout.addWidget(value_label, 1)
             self._value_labels[field] = value_label
             self._formatters[field] = formatter
+
+            content_layout.addWidget(field_widget, 1)
+            content_layout.setStretch(content_layout.count() - 1, 1)
 
             if index < len(self._FIELDS) - 1:
                 separator = QFrame()
                 separator.setObjectName("telemetrySeparator")
-                separator.setFixedSize(1, 14)
+                separator.setFixedSize(1, 18)
                 separator.setStyleSheet(
                     "QFrame#telemetrySeparator {"
                     "background-color: rgba(232, 241, 255, 0.12);"
@@ -194,8 +216,8 @@ class TelemetryPanel(CollapsiblePanel):
                     "}"
                 )
                 content_layout.addWidget(separator)
+                content_layout.setStretch(content_layout.count() - 1, 0)
 
-        content_layout.addStretch(1)
         self._apply_toggle_palette()
         self._update_toggle_icon()
 

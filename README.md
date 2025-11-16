@@ -29,14 +29,34 @@ pip install -r requirements.txt
 python simulation_main.py
 ```
 
-Use the control panel to experiment with different emotions and orientation values.
+Use the control panel to experiment with different emotions and orientation values. The new **Robot link** card (default host
+`192.168.1.169`) lets you tether the desktop face to a live robot: once connected the simulator streams telemetry from the TCP
+bridge, drives the embedded face with real motion data, and disables the manual sliders so you can focus on remote monitoring.
+
+### Robot runtime and TCP bridge
+
+To drive the face from real telemetry, launch the hardware runtime:
+
+```bash
+python robot_main.py
+```
+
+The runtime now exposes a TCP server on port 8765 that echoes every command it receives, forwards it to the robot's serial bus, and streams the latest telemetry frame to every connected client. This makes it easy to issue manual serial writes and monitor the sensor feed from another computer on the same network.
+
+Launch the rich PySide6 client to connect to the bridge from another laptop:
+
+```bash
+python serial_command_client.py --host <robot-ip> --port 8765
+```
+
+The client shares the same reusable TCP connection helper as the simulator, shows a live telemetry dashboard, a scrollback log (including the raw frames coming off the robot), and a command composer with send/clear controls. Any commands typed into the bottom bar are echoed back by the runtime so you can confirm they reached the robot.
 
 ## Integrating the Widget
 
 Import and instantiate `RoboticFaceWidget` in your PySide6 project:
 
 ```python
-from robotic_face_widget import RoboticFaceWidget
+from axon_ui import RoboticFaceWidget
 
 face = RoboticFaceWidget()
 face.set_emotion("happy")

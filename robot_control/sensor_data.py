@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
 
 ROLL_CALIBRATION = 5.420720526107142
@@ -26,6 +26,16 @@ REST_YAW_THRESHOLD = 4.5
 REST_ROLL_DELTA_THRESHOLD = 0.5
 REST_PITCH_DELTA_THRESHOLD = 0.5
 REST_YAW_DELTA_THRESHOLD = 1.0
+
+STEADY_ROLL_DELTA_THRESHOLD = 1.5
+STEADY_PITCH_DELTA_THRESHOLD = 1.5
+STEADY_YAW_DELTA_THRESHOLD = 2.5
+STEADY_SPEED_THRESHOLD = 2.5
+
+MAJOR_ROLL_DELTA_THRESHOLD = 6.0
+MAJOR_PITCH_DELTA_THRESHOLD = 6.0
+MAJOR_YAW_DELTA_THRESHOLD = 10.0
+MAJOR_SPEED_DELTA_THRESHOLD = 15.0
 
 
 @dataclass(slots=True)
@@ -75,8 +85,24 @@ class SensorSample:
         return {
             "yaw": _apply_deadband(self.calibrated_yaw, YAW_DEADBAND),
             "pitch": _apply_deadband(self.calibrated_pitch, PITCH_DEADBAND),
-            "roll": _apply_deadband(self.calibrated_roll, ROLL_DEADBAND),
+            # Invert roll so that the face leans in the intuitive direction.
+            "roll": _apply_deadband(-self.calibrated_roll, ROLL_DEADBAND),
         }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "SensorSample":
+        """Create a sample from a dict produced by :meth:`as_dict`."""
+
+        return cls(
+            message_type=int(payload.get("message_type", payload.get("T", 0))),
+            left_speed=float(payload.get("left_speed", payload.get("L", 0.0))),
+            right_speed=float(payload.get("right_speed", payload.get("R", 0.0))),
+            roll=float(payload.get("roll", payload.get("r", 0.0))),
+            pitch=float(payload.get("pitch", payload.get("p", 0.0))),
+            yaw=float(payload.get("yaw", payload.get("y", 0.0))),
+            temperature_c=float(payload.get("temperature_c", payload.get("temp", 0.0))),
+            voltage_v=float(payload.get("voltage_v", payload.get("v", 0.0))),
+        )
 
     @property
     def calibrated_roll(self) -> float:
@@ -138,6 +164,61 @@ class SensorSample:
             roll_delta <= roll_delta_threshold
             and pitch_delta <= pitch_delta_threshold
             and yaw_delta <= yaw_delta_threshold
+        )
+
+    def is_steady(
+        self,
+        previous_sample: "SensorSample" | None = None,
+        roll_delta_threshold: float = STEADY_ROLL_DELTA_THRESHOLD,
+        pitch_delta_threshold: float = STEADY_PITCH_DELTA_THRESHOLD,
+        yaw_delta_threshold: float = STEADY_YAW_DELTA_THRESHOLD,
+        speed_threshold: float = STEADY_SPEED_THRESHOLD,
+    ) -> bool:
+        """Return ``True`` when orientation and wheel speeds barely change."""
+
+        if previous_sample is None:
+            return False
+
+        roll_delta = abs(self.calibrated_roll - previous_sample.calibrated_roll)
+        pitch_delta = abs(self.calibrated_pitch - previous_sample.calibrated_pitch)
+        yaw_delta = abs(_wrap_angle(self.calibrated_yaw - previous_sample.calibrated_yaw))
+        max_speed = max(abs(self.left_speed), abs(self.right_speed))
+        prev_max_speed = max(abs(previous_sample.left_speed), abs(previous_sample.right_speed))
+
+        return (
+            roll_delta <= roll_delta_threshold
+            and pitch_delta <= pitch_delta_threshold
+            and yaw_delta <= yaw_delta_threshold
+            and max_speed <= speed_threshold
+            and prev_max_speed <= speed_threshold
+        )
+
+    def has_major_movement(
+        self,
+        previous_sample: "SensorSample" | None = None,
+        roll_delta_threshold: float = MAJOR_ROLL_DELTA_THRESHOLD,
+        pitch_delta_threshold: float = MAJOR_PITCH_DELTA_THRESHOLD,
+        yaw_delta_threshold: float = MAJOR_YAW_DELTA_THRESHOLD,
+        speed_delta_threshold: float = MAJOR_SPEED_DELTA_THRESHOLD,
+    ) -> bool:
+        """Return ``True`` when there is a noticeable change in orientation or speed."""
+
+        if previous_sample is None:
+            return True
+
+        roll_delta = abs(self.calibrated_roll - previous_sample.calibrated_roll)
+        pitch_delta = abs(self.calibrated_pitch - previous_sample.calibrated_pitch)
+        yaw_delta = abs(_wrap_angle(self.calibrated_yaw - previous_sample.calibrated_yaw))
+        max_speed_delta = max(
+            abs(self.left_speed - previous_sample.left_speed),
+            abs(self.right_speed - previous_sample.right_speed),
+        )
+
+        return (
+            roll_delta >= roll_delta_threshold
+            or pitch_delta >= pitch_delta_threshold
+            or yaw_delta >= yaw_delta_threshold
+            or max_speed_delta >= speed_delta_threshold
         )
 
 
