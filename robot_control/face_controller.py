@@ -5,7 +5,7 @@ from typing import Optional
 
 from PySide6.QtCore import QObject
 
-from robotic_face_widget import RoboticFaceWidget
+from axon_ui import RoboticFaceWidget
 
 from .emotion_policy import EmotionPolicy
 from .sensor_data import SensorSample
