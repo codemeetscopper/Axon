@@ -157,7 +157,7 @@ class RoboticFaceWidget(QWidget):
         )
 
         center = face_rect.center()
-        head_size = min(face_rect.width(), face_rect.height()) * 0.98
+        head_size = min(face_rect.width(), face_rect.height()) * 1.2
         face_rect = QRectF(
             center.x() - head_size * 0.5,
             center.y() - head_size * 0.5,
