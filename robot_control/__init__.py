@@ -5,6 +5,8 @@ from .serial_reader import SerialReader
 from .emotion_policy import EmotionPolicy
 from .face_controller import FaceController
 from .gyro_calibrator import GyroCalibrator
+from .serial_bridge_config import SerialBridgeConfig
+from .serial_bridge_server import SerialBridgeServer
 
 __all__ = [
     "SensorSample",
@@ -12,4 +14,6 @@ __all__ = [
     "EmotionPolicy",
     "FaceController",
     "GyroCalibrator",
+    "SerialBridgeConfig",
+    "SerialBridgeServer",
 ]

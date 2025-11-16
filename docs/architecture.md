@@ -12,23 +12,23 @@ UI layers.
 ```mermaid
 flowchart LR
     subgraph Hardware/Sim
-        S[Serial sensors\n(IMU, battery, misc)]
-        Sim[simulation_main\nmock sample generator]
+        S["Serial sensors<br/>(IMU, battery, misc)"]
+        Sim["simulation_main<br/>mock sample generator"]
     end
 
     subgraph robot_control
-        SR[SerialReader\n(robot_control.serial_reader)]
-        GC[GyroCalibrator\n(robot_control.gyro_calibrator)]
-        SD[SensorSample dataclass\n(robot_control.sensor_data)]
-        FC[FaceController\n(robot_control.face_controller)]
-        EP[EmotionPolicy\n(robot_control.emotion_policy)]
+        SR["SerialReader<br/>(robot_control.serial_reader)"]
+        GC["GyroCalibrator<br/>(robot_control.gyro_calibrator)"]
+        SD["SensorSample dataclass<br/>(robot_control.sensor_data)"]
+        FC["FaceController<br/>(robot_control.face_controller)"]
+        EP["EmotionPolicy<br/>(robot_control.emotion_policy)"]
     end
 
     subgraph UI
         Face[RoboticFaceWidget]
-        Display[FaceTelemetryDisplay\n(simulation_main)]
-        Telemetry[TelemetryPanel\n(axon_ui.telemetry)]
-        Info[InfoPanel\n(axon_ui.telemetry)]
+        Display["FaceTelemetryDisplay<br/>(axon_ros.ui.face_telemetry_display)"]
+        Telemetry["TelemetryPanel<br/>(axon_ui.telemetry_panel)"]
+        Info["InfoPanel<br/>(axon_ui.info_panel)"]
     end
 
     S -->|UART| SR

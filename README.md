@@ -29,7 +29,39 @@ pip install -r requirements.txt
 python simulation_main.py
 ```
 
-Use the control panel to experiment with different emotions and orientation values.
+The control panel lets you experiment with facial expressions locally or connect
+to the robot by supplying bridge parameters (IP/port) and clicking **Connect to
+robot**. Use the raw command box to send ad-hoc serial commands once connected.
+
+### ROS2-inspired runtime layout
+
+The runtime has been reorganized to mirror a ROS2 workspace. The new `axon_ros`
+package exposes dedicated "nodes" for the simulator (`SimulatorMainWindow`), the
+robot runtime (`RobotRuntime`/`RobotMainWindow`), and the shared UI overlay
+(`FaceTelemetryDisplay`). Each class lives in its own module so individual nodes
+can be composed from launch files or standalone scripts.
+
+### Robot runtime + serial bridge
+
+```bash
+python robot_main.py
+```
+
+`robot_main.py` remains the entry-point on the robot. It now boots a
+`SerialBridgeServer` that streams telemetry and forwards commands over TCP so a
+laptop can drive the UI remotely. By default the bridge listens on
+`0.0.0.0:8765`.
+
+### Remote PySide6 UI (laptop)
+
+```bash
+python simulation_main.py --host 192.168.1.169 --port 8765 --connect
+```
+
+The simulator now doubles as the remote UI: pass the robot's IP/port (default
+`192.168.1.169:8765`) and `--connect` to mirror telemetry plus face animations
+from the robot. The control panel exposes connection status along with a raw
+serial command sender for low-level debugging.
 
 ## Integrating the Widget
 
