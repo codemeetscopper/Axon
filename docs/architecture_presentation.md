@@ -10,8 +10,6 @@
 - `axon_ui.telemetry.TelemetryPanel`: raw sensor viewer + status icon.
 - `axon_ui.telemetry.InfoPanel`: metadata card with fullscreen toggle signal.
 - `robot_control.SerialReader`: pulls `SensorSample` objects from UART.
-- `robot_control.serial_command_server.SerialCommandServer`: re-shares the UART
-  link over TCP so remote tools can issue manual commands.
 - `robot_control.GyroCalibrator`: learns gyro offsets after 3 s of stability.
 - `robot_control.FaceController` + `EmotionPolicy`: converts normalized motion into mouth/eye poses.
 
@@ -24,8 +22,7 @@
 
 ## Slide 4 — UI Behavior
 - Overlay dock is pinned to the top-right and expands only to the left.
-- Telemetry and info bars now receive explicit width budgets so each component
-  fills the overlay dock without jitter.
+- Telemetry bar uses a fixed width budget after the minimized info icon.
 - Info panel arranges IP + Wi-Fi labels horizontally and hosts the fullscreen toggle.
 - Both panels start collapsed so the face consumes the full canvas at boot.
 

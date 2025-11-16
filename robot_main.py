@@ -10,13 +10,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
-from robot_control import (
-    EmotionPolicy,
-    FaceController,
-    SerialCommandServer,
-    SerialCommandServerConfig,
-    SerialReader,
-)
+from robot_control import EmotionPolicy, FaceController, SerialReader
 from robot_control.gyro_calibrator import GyroCalibrator
 from simulation_main import FaceTelemetryDisplay
 
@@ -124,7 +118,6 @@ DEFAULT_SERIAL_PORT = "/dev/ttyAMA0"
 DEFAULT_BAUDRATE = 115200
 DEFAULT_POLL_INTERVAL_MS = 40
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_COMMAND_PORT = 8765
 
 
 def _configure_logging(level: str) -> None:
@@ -153,12 +146,6 @@ def main() -> int:
         apply_palette(app)
 
     face = RoboticFaceWidget()
-    command_server = SerialCommandServer(
-        reader,
-        config=SerialCommandServerConfig(port=DEFAULT_COMMAND_PORT),
-    )
-    command_server.start()
-
     controller = FaceController(face, EmotionPolicy())
     telemetry = TelemetryPanel()
     info_panel = InfoPanel()
@@ -171,7 +158,6 @@ def main() -> int:
         poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
     )
     app.aboutToQuit.connect(runtime.stop)
-    app.aboutToQuit.connect(command_server.stop)
 
     # Support clean shutdown when Ctrl+C is pressed on the console.
     signal.signal(signal.SIGINT, lambda *_: app.quit())
@@ -187,7 +173,6 @@ def main() -> int:
         return 0
     finally:
         runtime.stop()
-        command_server.stop()
 
 
 if __name__ == "__main__":

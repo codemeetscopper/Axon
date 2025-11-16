@@ -276,10 +276,7 @@ class RoboticFaceWidget(QWidget):
         painter.setPen(QPen(QColor(70, 90, 160), max(2.0, width * 0.035)))
         painter.drawPath(outer_path)
 
-        iris_base = min(width, scaled_height) * 0.32
-        if vertical_scale < 0.5:
-            iris_base = max(iris_base, width * 0.34)
-        iris_radius = iris_base * iris_scale
+        iris_radius = min(width, scaled_height) * 0.32 * iris_scale
         iris_offset_x = yaw_offset * width * 0.45
         iris_offset_y = pitch_offset * scaled_height * 0.35
         iris_center = QPointF(center.x() + iris_offset_x, center.y() + iris_offset_y)
@@ -695,7 +692,7 @@ class RoboticFaceWidget(QWidget):
             ),
             "sleepy": EmotionPreset(
                 name="sleepy",
-                eye_openness=0.28,
+                eye_openness=0.35,
                 eye_curve=-0.2,
                 brow_raise=-0.15,
                 brow_tilt=-0.1,
@@ -703,7 +700,7 @@ class RoboticFaceWidget(QWidget):
                 mouth_open=0.05,
                 mouth_width=0.9,
                 mouth_height=0.7,
-                iris_size=1.35,
+                iris_size=0.9,
                 accent_color=(120, 180, 255),
             ),
             "curious": EmotionPreset(
