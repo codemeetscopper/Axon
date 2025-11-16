@@ -89,16 +89,19 @@ class FaceTelemetryDisplay(QWidget):
         overlay_layout = QVBoxLayout(overlay)
         overlay_layout.setContentsMargins(16, 16, 16, 16)
         overlay_layout.setSpacing(0)
-        overlay_layout.addStretch(1)
 
         dock = QWidget(overlay)
         dock_layout = QHBoxLayout(dock)
         dock_layout.setContentsMargins(0, 0, 0, 0)
-        dock_layout.setSpacing(8)
-        dock_layout.addStretch(1)
+        dock_layout.setSpacing(10)
+        dock_layout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
         for widget in self._overlay_widgets:
-            dock_layout.addWidget(widget, 0, Qt.AlignmentFlag.AlignRight)
+            widget.setSizePolicy(
+                QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed
+            )
+            dock_layout.addWidget(widget, 0, Qt.AlignmentFlag.AlignTop)
         overlay_layout.addWidget(dock, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        overlay_layout.addStretch(1)
         self._register_collapsible_panels()
         stack.addWidget(overlay)
 

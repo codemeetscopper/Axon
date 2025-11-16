@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import socket
 import subprocess
 from typing import TYPE_CHECKING, Callable, Optional
@@ -16,7 +17,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -42,7 +42,7 @@ class CollapsiblePanel(QFrame):
         self._collapsed = True
         self._toggle_button: Optional[QPushButton] = None
         self._content_frame: Optional[QFrame] = None
-        self._shadow: Optional[QGraphicsDropShadowEffect] = None
+        self._shadow = None
 
     def toggle(self) -> None:
         self.set_collapsed(not self._collapsed)
@@ -111,6 +111,7 @@ class TelemetryPanel(CollapsiblePanel):
         self._blink_timer.timeout.connect(self._handle_blink)
         self._streaming = False
         self.setObjectName("telemetryPanel")
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self._build_ui()
         self.set_streaming(False)
         self._apply_collapsed_state(True)
@@ -119,12 +120,9 @@ class TelemetryPanel(CollapsiblePanel):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
             "#telemetryPanel {"
-            "background-color: rgba(10, 18, 38, 0.22);"
+            "background-color: rgba(4, 9, 20, 0.65);"
             "border-radius: 16px;"
-            "border: 1px solid rgba(90, 120, 190, 0.28);"
-            "}"
-            "#telemetryPanel[collapsed=\"true\"] {"
-            "background-color: rgba(10, 18, 38, 0.32);"
+            "border: none;"
             "}"
             "#telemetryPanel QLabel {"
             "color: #e8f1ff;"
@@ -134,7 +132,7 @@ class TelemetryPanel(CollapsiblePanel):
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 4, 10, 4)
+        layout.setContentsMargins(12, 4, 8, 4)
         layout.setSpacing(6)
 
         content = QFrame()
@@ -149,8 +147,8 @@ class TelemetryPanel(CollapsiblePanel):
         self._toggle_button = QPushButton()
         self._toggle_button.setObjectName("telemetryToggle")
         self._toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_button.setMinimumSize(28, 28)
-        self._toggle_button.setIconSize(QSize(22, 22))
+        self._toggle_button.setMinimumSize(26, 26)
+        self._toggle_button.setIconSize(QSize(20, 20))
         self._toggle_button.setToolTip("Show/Hide telemetry")
         self._toggle_button.clicked.connect(self.toggle)
         self._toggle_button.setText("")
@@ -167,7 +165,7 @@ class TelemetryPanel(CollapsiblePanel):
             value_label = QLabel("--")
             value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             value_label.setStyleSheet(
-                f"color: {color}; font-size: 14px; font-weight: 600;"
+                "color: #e8f1ff; font-size: 14px; font-weight: 600;"
             )
             value_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
             content_layout.addWidget(value_label)
@@ -190,12 +188,7 @@ class TelemetryPanel(CollapsiblePanel):
         self._apply_toggle_palette()
         self._update_toggle_icon()
 
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(38)
-        shadow.setOffset(0, 6)
-        self.setGraphicsEffect(shadow)
-        self._shadow = shadow
-        self._update_shadow()
+        self._shadow = None
 
     def _build_icon_pixmap(self, icon_key: str, color: str) -> QPixmap:
         size = 22
@@ -428,6 +421,7 @@ class InfoPanel(CollapsiblePanel):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(15000)
         self._refresh_timer.timeout.connect(self.refresh_info)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self._build_ui()
         self.refresh_info()
         self._refresh_timer.start()
@@ -437,9 +431,9 @@ class InfoPanel(CollapsiblePanel):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
             "#infoPanel {"
-            "background-color: rgba(10, 18, 38, 0.22);"
+            "background-color: rgba(4, 9, 20, 0.65);"
             "border-radius: 16px;"
-            "border: 1px solid rgba(90, 120, 190, 0.28);"
+            "border: none;"
             "}"
             "#infoPanel QLabel {"
             "color: #e8f1ff;"
@@ -468,20 +462,17 @@ class InfoPanel(CollapsiblePanel):
         self._ip_label = ip_label
         self._wifi_label = wifi_label
 
-        self._toggle_button = QPushButton("INFO")
+        self._toggle_button = QPushButton()
         self._toggle_button.setObjectName("infoToggle")
         self._toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_button.setMinimumSize(48, 28)
+        self._toggle_button.setMinimumSize(26, 26)
+        self._toggle_button.setIconSize(QSize(20, 20))
         self._toggle_button.setToolTip("Show device information")
         self._toggle_button.clicked.connect(self.toggle)
+        self._toggle_button.setText("")
         layout.addWidget(self._toggle_button, 0, Qt.AlignmentFlag.AlignRight)
 
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(36)
-        shadow.setOffset(0, 5)
-        shadow.setColor(QColor(46, 153, 255, 70))
-        self.setGraphicsEffect(shadow)
-        self._shadow = shadow
+        self._shadow = None
 
     def refresh_info(self) -> None:
         if self._ip_label is not None:
@@ -496,18 +487,21 @@ class InfoPanel(CollapsiblePanel):
             "#infoToggle {"
             "background-color: transparent;"
             "border: none;"
-            "color: #e8f1ff;"
-            "font-weight: 600;"
-            "letter-spacing: 0.08em;"
+            "padding: 0px;"
             "}"
             "#infoToggle:hover {"
-            "color: #4CC9F0;"
+            "background-color: transparent;"
             "}"
         )
 
     def _update_toggle_icon(self) -> None:
-        # The button uses text, so no extra icon updates are required.
-        return
+        if self._toggle_button is None:
+            return
+        color = QColor("#4CC9F0")
+        if self._collapsed:
+            color.setAlphaF(0.85)
+        pixmap = self._build_info_icon(color)
+        self._toggle_button.setIcon(QIcon(pixmap))
 
     def _update_shadow(self) -> None:
         if self._shadow is None:
@@ -516,6 +510,33 @@ class InfoPanel(CollapsiblePanel):
         color = QColor(76, 201, 240)
         color.setAlpha(opacity)
         self._shadow.setColor(color)
+
+    def _build_info_icon(self, color: QColor) -> QPixmap:
+        size = 20
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        pen = QPen(color)
+        pen.setWidthF(2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        center = QPointF(size / 2.0, size / 2.0)
+        radius = size * 0.38
+        painter.drawEllipse(center, radius, radius)
+
+        painter.drawPoint(QPointF(center.x(), center.y() - radius * 0.35))
+        painter.drawLine(
+            QPointF(center.x(), center.y() - radius * 0.05),
+            QPointF(center.x(), center.y() + radius * 0.35),
+        )
+
+        painter.end()
+        return pixmap
 
 
 def _detect_ip_address() -> str:
@@ -536,10 +557,71 @@ def _detect_ip_address() -> str:
 
 
 def _detect_wifi_name() -> str:
+    detectors = (
+        _wifi_from_nmcli,
+        _wifi_from_iwgetid,
+        _wifi_from_networksetup,
+        _wifi_from_netsh,
+    )
+    for detector in detectors:
+        ssid = detector()
+        if ssid:
+            return ssid
+    return "Unavailable"
+
+
+def _wifi_from_nmcli() -> Optional[str]:
+    try:
+        result = subprocess.check_output(
+            ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"], text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    for line in result.splitlines():
+        parts = line.strip().split(":", 1)
+        if len(parts) == 2 and parts[0] == "yes" and parts[1]:
+            return parts[1]
+    return None
+
+
+def _wifi_from_iwgetid() -> Optional[str]:
     try:
         result = subprocess.check_output(["iwgetid", "-r"], text=True)
-        ssid = result.strip()
-        return ssid or "Unknown"
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return "Unknown"
+        return None
+    ssid = result.strip()
+    return ssid or None
+
+
+def _wifi_from_networksetup() -> Optional[str]:
+    try:
+        result = subprocess.check_output(
+            ["networksetup", "-getairportnetwork", "en0"], text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    match = re.search(r":\s*(.+)", result.strip())
+    if match:
+        name = match.group(1).strip()
+        if name and name.lower() != "off":
+            return name
+    return None
+
+
+def _wifi_from_netsh() -> Optional[str]:
+    try:
+        result = subprocess.check_output(
+            ["netsh", "wlan", "show", "interfaces"], text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    for line in result.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("ssid") and "bssid" not in stripped.lower():
+            parts = stripped.split(":", 1)
+            if len(parts) == 2:
+                candidate = parts[1].strip()
+                if candidate:
+                    return candidate
+    return None
 
