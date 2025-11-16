@@ -39,6 +39,7 @@ class ControlPanel(QWidget):
         self._cycle_timer = QTimer(self)
         self._cycle_timer.setInterval(2600)
         self._cycle_timer.timeout.connect(self._advance_cycle)
+        self._simulation_enabled = True
         self._telemetry_values: dict[str, float] = {
             "message_type": 1001.0,
             "left_speed": 0.0,
@@ -53,6 +54,21 @@ class ControlPanel(QWidget):
         self._telemetry_sliders: dict[str, QSlider] = {}
         self._build_ui()
         self._push_telemetry()
+
+    def set_simulation_enabled(self, enabled: bool) -> None:
+        """Enable or disable the manual simulation controls."""
+
+        if self._simulation_enabled == enabled:
+            return
+        self._simulation_enabled = enabled
+        super().setEnabled(enabled)
+        if not enabled:
+            self._cycle_timer.stop()
+        elif self.cycle_checkbox.isChecked():
+            self._cycle_timer.start()
+
+    def is_simulation_enabled(self) -> bool:
+        return self._simulation_enabled
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
