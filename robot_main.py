@@ -9,14 +9,13 @@ from typing import Optional, Sequence
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
+from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
 from robot_control import EmotionPolicy, FaceController, SerialReader
 from robot_control.gyro_calibrator import GyroCalibrator
-from robotic_face_widget import RoboticFaceWidget
 from simulation_main import FaceTelemetryDisplay
-from telemetry_panel import InfoPanel, TelemetryPanel
 
 try:  # Reuse the palette from the interactive demo when available.
-    from app_palette import apply_dark_palette as apply_palette
+    from axon_ui import apply_dark_palette as apply_palette
 except Exception:  # pragma: no cover - best effort reuse
     apply_palette = None  # type: ignore[assignment]
 

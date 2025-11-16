@@ -23,10 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app_palette import apply_dark_palette
+from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel, apply_dark_palette
 from robot_control.sensor_data import SensorSample
-from telemetry_panel import InfoPanel, TelemetryPanel
-from robotic_face_widget import RoboticFaceWidget
 
 # Backwards compatibility for external imports expecting the old helper name.
 _apply_dark_palette = apply_dark_palette

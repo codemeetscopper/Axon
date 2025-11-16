@@ -27,6 +27,11 @@ REST_ROLL_DELTA_THRESHOLD = 0.5
 REST_PITCH_DELTA_THRESHOLD = 0.5
 REST_YAW_DELTA_THRESHOLD = 1.0
 
+MAJOR_ROLL_DELTA_THRESHOLD = 6.0
+MAJOR_PITCH_DELTA_THRESHOLD = 6.0
+MAJOR_YAW_DELTA_THRESHOLD = 10.0
+MAJOR_SPEED_DELTA_THRESHOLD = 15.0
+
 
 @dataclass(slots=True)
 class SensorSample:
@@ -75,7 +80,8 @@ class SensorSample:
         return {
             "yaw": _apply_deadband(self.calibrated_yaw, YAW_DEADBAND),
             "pitch": _apply_deadband(self.calibrated_pitch, PITCH_DEADBAND),
-            "roll": _apply_deadband(self.calibrated_roll, ROLL_DEADBAND),
+            # Invert roll so that the face leans in the intuitive direction.
+            "roll": _apply_deadband(-self.calibrated_roll, ROLL_DEADBAND),
         }
 
     @property
@@ -138,6 +144,34 @@ class SensorSample:
             roll_delta <= roll_delta_threshold
             and pitch_delta <= pitch_delta_threshold
             and yaw_delta <= yaw_delta_threshold
+        )
+
+    def has_major_movement(
+        self,
+        previous_sample: "SensorSample" | None = None,
+        roll_delta_threshold: float = MAJOR_ROLL_DELTA_THRESHOLD,
+        pitch_delta_threshold: float = MAJOR_PITCH_DELTA_THRESHOLD,
+        yaw_delta_threshold: float = MAJOR_YAW_DELTA_THRESHOLD,
+        speed_delta_threshold: float = MAJOR_SPEED_DELTA_THRESHOLD,
+    ) -> bool:
+        """Return ``True`` when there is a noticeable change in orientation or speed."""
+
+        if previous_sample is None:
+            return True
+
+        roll_delta = abs(self.calibrated_roll - previous_sample.calibrated_roll)
+        pitch_delta = abs(self.calibrated_pitch - previous_sample.calibrated_pitch)
+        yaw_delta = abs(_wrap_angle(self.calibrated_yaw - previous_sample.calibrated_yaw))
+        max_speed_delta = max(
+            abs(self.left_speed - previous_sample.left_speed),
+            abs(self.right_speed - previous_sample.right_speed),
+        )
+
+        return (
+            roll_delta >= roll_delta_threshold
+            or pitch_delta >= pitch_delta_threshold
+            or yaw_delta >= yaw_delta_threshold
+            or max_speed_delta >= speed_delta_threshold
         )
 
 

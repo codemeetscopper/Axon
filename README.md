@@ -36,7 +36,7 @@ Use the control panel to experiment with different emotions and orientation valu
 Import and instantiate `RoboticFaceWidget` in your PySide6 project:
 
 ```python
-from robotic_face_widget import RoboticFaceWidget
+from axon_ui import RoboticFaceWidget
 
 face = RoboticFaceWidget()
 face.set_emotion("happy")

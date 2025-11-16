@@ -27,8 +27,8 @@ flowchart LR
     subgraph UI
         Face[RoboticFaceWidget]
         Display[FaceTelemetryDisplay\n(simulation_main)]
-        Telemetry[TelemetryPanel\n(telemetry_panel)]
-        Info[InfoPanel\n(telemetry_panel)]
+        Telemetry[TelemetryPanel\n(axon_ui.telemetry)]
+        Info[InfoPanel\n(axon_ui.telemetry)]
     end
 
     S -->|UART| SR
