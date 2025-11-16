@@ -47,6 +47,9 @@ flowchart LR
 
 - **SerialReader** continuously polls the microcontroller over UART (or a mock
   publisher in the simulator) and produces `SensorSample` objects.
+- **SerialCommandServer** mirrors the UART link over TCP so remote tools can
+  issue manual commands. The included `serial_command_client.py` script offers a
+  convenient CLI for driving that bridge from another computer.
 - **GyroCalibrator** watches short-term IMU stability windows and learns the
   baseline offsets that should be subtracted before feeding gyro data into the
   face controller.

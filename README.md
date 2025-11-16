@@ -31,6 +31,24 @@ python simulation_main.py
 
 Use the control panel to experiment with different emotions and orientation values.
 
+### Robot runtime and TCP bridge
+
+To drive the face from real telemetry, launch the hardware runtime:
+
+```bash
+python robot_main.py
+```
+
+The runtime now exposes a TCP server on port 8765 that echoes every command it receives and forwards it to the robot's serial bus. This makes it easy to issue manual serial writes from another computer on the same network.
+
+Connect with the included client utility:
+
+```bash
+./serial_command_client.py --host <robot-ip> --port 8765 "LED ON"
+```
+
+Running the client without a command starts an interactive prompt where every line you type is sent to the robot and the echoed response is printed back.
+
 ## Integrating the Widget
 
 Import and instantiate `RoboticFaceWidget` in your PySide6 project:

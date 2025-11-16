@@ -27,6 +27,7 @@ class SerialReader:
             raise RuntimeError(f"Unable to open serial port {port!r}: {exc}") from exc
 
         self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._latest: Optional[SensorSample] = None
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -66,6 +67,24 @@ class SerialReader:
 
     def has_error(self) -> bool:
         return self._error is not None
+
+    def send_command(self, command: str | bytes) -> None:
+        """Write a command to the serial port in a thread-safe manner."""
+
+        if self._closed:
+            raise RuntimeError("Serial connection is closed")
+
+        if isinstance(command, str):
+            payload = command.encode("utf-8")
+        else:
+            payload = command
+
+        if not payload.endswith(b"\n"):
+            payload += b"\n"
+
+        with self._write_lock:
+            self._serial.write(payload)
+            self._serial.flush()
 
     def _run(self) -> None:
         try:
