@@ -9,14 +9,19 @@ from typing import Optional, Sequence
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
-from robot_control import EmotionPolicy, FaceController, SerialReader
+from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
+from robot_control import (
+    EmotionPolicy,
+    FaceController,
+    SerialCommandServer,
+    SerialCommandServerConfig,
+    SerialReader,
+)
 from robot_control.gyro_calibrator import GyroCalibrator
-from robotic_face_widget import RoboticFaceWidget
 from simulation_main import FaceTelemetryDisplay
-from telemetry_panel import InfoPanel, TelemetryPanel
 
 try:  # Reuse the palette from the interactive demo when available.
-    from app_palette import apply_dark_palette as apply_palette
+    from axon_ui import apply_dark_palette as apply_palette
 except Exception:  # pragma: no cover - best effort reuse
     apply_palette = None  # type: ignore[assignment]
 
@@ -119,6 +124,7 @@ DEFAULT_SERIAL_PORT = "/dev/ttyAMA0"
 DEFAULT_BAUDRATE = 115200
 DEFAULT_POLL_INTERVAL_MS = 40
 DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_COMMAND_PORT = 8765
 
 
 def _configure_logging(level: str) -> None:
@@ -147,6 +153,12 @@ def main() -> int:
         apply_palette(app)
 
     face = RoboticFaceWidget()
+    command_server = SerialCommandServer(
+        reader,
+        config=SerialCommandServerConfig(port=DEFAULT_COMMAND_PORT),
+    )
+    command_server.start()
+
     controller = FaceController(face, EmotionPolicy())
     telemetry = TelemetryPanel()
     info_panel = InfoPanel()
@@ -159,6 +171,7 @@ def main() -> int:
         poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
     )
     app.aboutToQuit.connect(runtime.stop)
+    app.aboutToQuit.connect(command_server.stop)
 
     # Support clean shutdown when Ctrl+C is pressed on the console.
     signal.signal(signal.SIGINT, lambda *_: app.quit())
@@ -174,6 +187,7 @@ def main() -> int:
         return 0
     finally:
         runtime.stop()
+        command_server.stop()
 
 
 if __name__ == "__main__":

@@ -23,10 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app_palette import apply_dark_palette
+from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel, apply_dark_palette
 from robot_control.sensor_data import SensorSample
-from telemetry_panel import InfoPanel, TelemetryPanel
-from robotic_face_widget import RoboticFaceWidget
 
 # Backwards compatibility for external imports expecting the old helper name.
 _apply_dark_palette = apply_dark_palette
@@ -181,17 +179,27 @@ class FaceTelemetryDisplay(QWidget):
             return
         available_width = max(0, self.width() - 2 * self._overlay_margin)
         self._overlay_dock.setFixedWidth(available_width)
+        extras = [
+            widget
+            for widget in self._overlay_widgets
+            if widget is not self._telemetry_panel
+        ]
+        reserved = 0
+        for widget in extras:
+            panel_width = self._panel_width(widget)
+            self._set_panel_width(widget, panel_width)
+            reserved += panel_width
+        spacing = (self._dock_layout.spacing() if self._dock_layout is not None else 0)
+        reserved += spacing * len(extras)
+
         if self._telemetry_panel is None:
             return
+
         collapsed_width = self._telemetry_panel.collapsed_width()
         if self._telemetry_panel.is_collapsed():
             width = collapsed_width
         else:
-            reserved = 0
-            if self._info_panel is not None:
-                reserved = self._info_panel.collapsed_width()
-            spacing = self._dock_layout.spacing() if self._dock_layout is not None else 0
-            width = max(collapsed_width, available_width - reserved - spacing)
+            width = max(collapsed_width, available_width - reserved)
         self._set_panel_width(self._telemetry_panel, width)
 
     @staticmethod
@@ -199,6 +207,15 @@ class FaceTelemetryDisplay(QWidget):
         width = max(0, int(width))
         panel.setMinimumWidth(width)
         panel.setMaximumWidth(width)
+
+    @staticmethod
+    def _panel_width(panel: QWidget) -> int:
+        is_collapsed = getattr(panel, "is_collapsed", None)
+        collapsed_width = getattr(panel, "collapsed_width", None)
+        if callable(is_collapsed) and is_collapsed() and callable(collapsed_width):
+            return int(collapsed_width())
+        hint = panel.sizeHint()
+        return max(0, hint.width())
 
 
 class ControlPanel(QWidget):
