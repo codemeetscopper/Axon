@@ -51,6 +51,24 @@ python serial_command_client.py --host <robot-ip> --port 8765
 
 The client shares the same reusable TCP connection helper as the simulator, shows a live telemetry dashboard, a scrollback log (including the raw frames coming off the robot), and a command composer with send/clear controls. Any commands typed into the bottom bar are echoed back by the runtime so you can confirm they reached the robot.
 
+### Robot runtime and TCP bridge
+
+To drive the face from real telemetry, launch the hardware runtime:
+
+```bash
+python robot_main.py
+```
+
+The runtime now exposes a TCP server on port 8765 that echoes every command it receives, forwards it to the robot's serial bus, and streams the latest telemetry frame to every connected client. This makes it easy to issue manual serial writes and monitor the sensor feed from another computer on the same network.
+
+Launch the rich PySide6 client to connect to the bridge:
+
+```bash
+python serial_command_client.py --host <robot-ip> --port 8765
+```
+
+The client shows a live telemetry dashboard, a scrollback log (including the raw frames coming off the robot), and a command composer with send/clear controls. Any commands typed into the bottom bar are echoed back by the runtime so you can confirm they reached the robot.
+
 ## Integrating the Widget
 
 Import and instantiate `RoboticFaceWidget` in your PySide6 project:
