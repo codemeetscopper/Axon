@@ -9,6 +9,12 @@ ROLL_CALIBRATION = 5.420720526107142
 PITCH_CALIBRATION = -12.253261345
 YAW_CALIBRATION = 166.39189556785712
 
+_CALIBRATION_OFFSETS = {
+    "roll": ROLL_CALIBRATION,
+    "pitch": PITCH_CALIBRATION,
+    "yaw": YAW_CALIBRATION,
+}
+
 ROLL_DEADBAND = 0.6
 PITCH_DEADBAND = 0.6
 YAW_DEADBAND = 1.0
@@ -74,15 +80,15 @@ class SensorSample:
 
     @property
     def calibrated_roll(self) -> float:
-        return self.roll - ROLL_CALIBRATION
+        return self.roll - _CALIBRATION_OFFSETS["roll"]
 
     @property
     def calibrated_pitch(self) -> float:
-        return self.pitch - PITCH_CALIBRATION
+        return self.pitch - _CALIBRATION_OFFSETS["pitch"]
 
     @property
     def calibrated_yaw(self) -> float:
-        return _wrap_angle(self.yaw - YAW_CALIBRATION)
+        return _wrap_angle(self.yaw - _CALIBRATION_OFFSETS["yaw"])
 
     @property
     def is_robot_frame(self) -> bool:
@@ -149,3 +155,20 @@ def _apply_deadband(value: float, threshold: float) -> float:
     """Clamp tiny variations around zero to zero to steady the face."""
 
     return 0.0 if abs(value) < threshold else value
+
+
+def set_calibration_offsets(*, roll: float | None = None, pitch: float | None = None, yaw: float | None = None) -> None:
+    """Update the calibration offsets used to normalize gyro readings."""
+
+    if roll is not None:
+        _CALIBRATION_OFFSETS["roll"] = float(roll)
+    if pitch is not None:
+        _CALIBRATION_OFFSETS["pitch"] = float(pitch)
+    if yaw is not None:
+        _CALIBRATION_OFFSETS["yaw"] = float(yaw)
+
+
+def get_calibration_offsets() -> Dict[str, float]:
+    """Return a copy of the current calibration offsets."""
+
+    return dict(_CALIBRATION_OFFSETS)

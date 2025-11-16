@@ -4,10 +4,12 @@ from .sensor_data import SensorSample
 from .serial_reader import SerialReader
 from .emotion_policy import EmotionPolicy
 from .face_controller import FaceController
+from .gyro_calibrator import GyroCalibrator
 
 __all__ = [
     "SensorSample",
     "SerialReader",
     "EmotionPolicy",
     "FaceController",
+    "GyroCalibrator",
 ]

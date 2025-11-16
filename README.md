@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ### Running the demo
 
 ```bash
-python main.py
+python simulation_main.py
 ```
 
 Use the control panel to experiment with different emotions and orientation values.

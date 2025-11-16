@@ -498,8 +498,8 @@ class RoboticFaceWidget(QWidget):
         painter.save()
 
         adjusted_center = QPointF(mouth_center)
-        rect_width = face_rect.width() * 0.32 * self._state["mouth_width"]
-        rect_height = max(24.0, min(34.0, face_rect.height() * 0.06))
+        rect_width = face_rect.width() * 0.46 * self._state["mouth_width"]
+        rect_height = max(12.0, min(18.0, face_rect.height() * 0.03))
 
         horizontal_margin = face_rect.width() * 0.08
         vertical_margin = face_rect.height() * 0.1
@@ -597,27 +597,26 @@ class RoboticFaceWidget(QWidget):
 
         adjusted_center = QPointF(mouth_center)
         base_size = face_rect.width() * 0.22 * self._state["mouth_width"]
-        size = max(38.0, base_size)
+        width = max(38.0, base_size)
+        height = max(32.0, width * 1.05 * self._state["mouth_height"])
 
         horizontal_margin = face_rect.width() * 0.08
         vertical_margin = face_rect.height() * 0.1
-        max_center_x = face_rect.right() - horizontal_margin - size * 0.5
-        min_center_x = face_rect.left() + horizontal_margin + size * 0.5
+        max_center_x = face_rect.right() - horizontal_margin - width * 0.5
+        min_center_x = face_rect.left() + horizontal_margin + width * 0.5
         adjusted_center.setX(max(min_center_x, min(max_center_x, adjusted_center.x())))
 
         face_center_y = face_rect.center().y()
-        max_center_y = face_rect.bottom() - vertical_margin - size * 0.5
+        max_center_y = face_rect.bottom() - vertical_margin - height * 0.5
         min_center_y = face_center_y + face_rect.height() * 0.02
         adjusted_center.setY(max(min_center_y, min(max_center_y, adjusted_center.y())))
 
         rect = QRectF(
-            adjusted_center.x() - size * 0.5,
-            adjusted_center.y() - size * 0.5,
-            size,
-            size,
+            adjusted_center.x() - width * 0.5,
+            adjusted_center.y() - height * 0.5,
+            width,
+            height,
         )
-
-        corner_radius = min(size * 0.45, 24.0 + face_rect.width() * 0.015)
 
         fill_color = QColor(
             int(accent.red() * 0.6 + 40),
@@ -630,7 +629,7 @@ class RoboticFaceWidget(QWidget):
         painter.setPen(QPen(pen_color, stroke_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
 
         path = QPainterPath()
-        path.addRoundedRect(rect, corner_radius, corner_radius)
+        path.addEllipse(rect)
         painter.drawPath(path)
         painter.restore()
 
