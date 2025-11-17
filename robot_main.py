@@ -48,13 +48,23 @@ def main() -> int:
     except RuntimeError as exc:
         LOGGER.error("%s", exc)
         return 1
-    stack.register(OsiLayer.PHYSICAL, "SerialReadWriter", reader, "UART sensor feed")
+    stack.register(
+        OsiLayer.PHYSICAL,
+        "SerialReadWriter",
+        reader,
+        description="UART sensor feed",
+    )
 
     bridge = SerialBridgeServer(
         reader,
         config=SerialBridgeConfig(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_BRIDGE_PORT),
     )
-    stack.register(OsiLayer.TRANSPORT, "SerialBridgeServer", bridge, "TCP telemetry bridge")
+    stack.register(
+        OsiLayer.TRANSPORT,
+        "SerialBridgeServer",
+        bridge,
+        description="TCP telemetry bridge",
+    )
 
     app = QApplication(sys.argv)
     app.setApplicationDisplayName("Axon Runtime")
@@ -82,7 +92,12 @@ def main() -> int:
         calibrator=calibrator,
         bridge=bridge,
     )
-    stack.register(OsiLayer.SESSION, "RobotRuntime", runtime, "Qt polling loop")
+    stack.register(
+        OsiLayer.SESSION,
+        "RobotRuntime",
+        runtime,
+        description="Qt polling loop",
+    )
     app.aboutToQuit.connect(runtime.stop)
 
     LOGGER.info("%s", describe_stack(stack))
