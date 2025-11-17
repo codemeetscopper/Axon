@@ -127,15 +127,15 @@ class BridgeChassisPanel(QWidget):
             button.clicked.connect(callback)
             return button
 
-        grid.addWidget(pad_button("NW", lambda: self._send_direction(-0.3, 0.7)), 0, 0)
+        grid.addWidget(pad_button("NW", lambda: self._send_direction(-0.3, 1.0)), 0, 0)
         grid.addWidget(pad_button("N", lambda: self._send_direction(1.0, 1.0)), 0, 1)
-        grid.addWidget(pad_button("NE", lambda: self._send_direction(0.7, 0.3)), 0, 2)
-        grid.addWidget(pad_button("W", lambda: self._send_direction(-0.6, 0.6)), 1, 0)
+        grid.addWidget(pad_button("NE", lambda: self._send_direction(1.0, 0.3)), 0, 2)
+        grid.addWidget(pad_button("W", lambda: self._send_direction(-1.0, 1.0)), 1, 0)
         grid.addWidget(pad_button("STOP", self._send_stop), 1, 1)
-        grid.addWidget(pad_button("E", lambda: self._send_direction(0.6, -0.6)), 1, 2)
-        grid.addWidget(pad_button("SW", lambda: self._send_direction(-0.7, -0.3)), 2, 0)
+        grid.addWidget(pad_button("E", lambda: self._send_direction(1.0, -1.0)), 1, 2)
+        grid.addWidget(pad_button("SW", lambda: self._send_direction(-1.0, -0.3)), 2, 0)
         grid.addWidget(pad_button("S", lambda: self._send_direction(-1.0, -1.0)), 2, 1)
-        grid.addWidget(pad_button("SE", lambda: self._send_direction(0.3, -0.7)), 2, 2)
+        grid.addWidget(pad_button("SE", lambda: self._send_direction(0.3, -1.0)), 2, 2)
 
         return container
 
