@@ -23,7 +23,7 @@ class FaceController(QObject):
         super().__init__(parent)
         self._face = face
         self._policy = policy or EmotionPolicy()
-        self._current_emotion: str | None = self._policy.default_emotion
+        self._current_emotion: str | None = "neutral"
         self._steady_start: float | None = None
         self._rest_delay = 30.0
         self._sleep_emotion = "sleepy"
