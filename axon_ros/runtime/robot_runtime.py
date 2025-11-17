@@ -6,7 +6,7 @@ from typing import Optional
 
 from PySide6.QtCore import QObject, QTimer
 
-from robot_control import FaceController, SerialReader
+from robot_control import FaceController, SerialReadWriter
 from robot_control.gyro_calibrator import GyroCalibrator
 from robot_control.serial_bridge_server import SerialBridgeServer
 from axon_ui import TelemetryPanel
@@ -17,7 +17,7 @@ class RobotRuntime(QObject):
 
     def __init__(
         self,
-        reader: SerialReader,
+        reader: SerialReadWriter,
         controller: FaceController,
         telemetry: TelemetryPanel,
         poll_interval_ms: int = 40,

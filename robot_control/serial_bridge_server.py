@@ -11,7 +11,7 @@ from typing import Optional
 from robot_control.sensor_data import SensorSample
 
 from .serial_bridge_config import SerialBridgeConfig
-from .serial_reader import SerialReader
+from .serial_reader import SerialReadWriter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class SerialBridgeServer:
 
     def __init__(
         self,
-        reader: SerialReader,
+        reader: SerialReadWriter,
         *,
         config: SerialBridgeConfig | None = None,
     ) -> None:

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from PySide6.QtWidgets import QApplication
 
+from axon_ros.osi import OsiLayer, OsiStack, describe_stack
 from axon_ros.runtime import RobotMainWindow
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel, apply_dark_palette
 from robot_control.remote_bridge import RemoteBridgeController
 
 DEFAULT_HOST = "192.168.1.169"
 DEFAULT_PORT = 8765
+
+LOGGER = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +36,11 @@ def main(argv: list[str] | None = None) -> int:
 
     controller = RemoteBridgeController(face, telemetry)
     controller.connect_to(args.host, args.port)
+
+    stack = OsiStack("Remote UI")
+    stack.register(OsiLayer.NETWORK, "RemoteBridgeController", controller)
+    stack.register(OsiLayer.APPLICATION, "RobotMainWindow", window)
+    LOGGER.debug("%s", describe_stack(stack))
 
     app.aboutToQuit.connect(controller.disconnect)
     window.resize(1024, 600)

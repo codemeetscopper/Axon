@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 
 from PySide6.QtWidgets import QApplication
 
+from axon_ros.osi import OsiLayer, OsiStack, describe_stack
 from axon_ros.ui import SimulatorMainWindow
 from axon_ui import apply_dark_palette
+from robot_control import EmotionPolicy, GyroCalibrator
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -32,10 +37,20 @@ def main(argv: list[str] | None = None) -> int:
     app.setStyle("Fusion")
     apply_dark_palette(app)
 
+    policy = EmotionPolicy()
+    calibrator = GyroCalibrator()
+    stack = OsiStack("Simulator")
+    stack.register(OsiLayer.PRESENTATION, "EmotionPolicy", policy)
+    stack.register(OsiLayer.PRESENTATION, "GyroCalibrator", calibrator)
+
     window = SimulatorMainWindow(
         bridge_host=args.bridge_host,
         bridge_port=args.bridge_port,
+        policy=policy,
+        calibrator=calibrator,
     )
+    stack.register(OsiLayer.APPLICATION, "SimulatorMainWindow", window)
+    LOGGER.debug("%s", describe_stack(stack))
     window.resize(1220, 620)
     window.show()
     app.aboutToQuit.connect(window.shutdown)

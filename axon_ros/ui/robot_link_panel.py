@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
 )
 
 from axon_ui import RoboticFaceWidget, TelemetryPanel
+from robot_control.emotion_policy import EmotionPolicy
+from robot_control.gyro_calibrator import GyroCalibrator
+from robot_control.sensor_data import SensorSample, get_calibration_offsets
 from robot_control.remote_bridge import (
     DEFAULT_BRIDGE_HOST,
     DEFAULT_BRIDGE_PORT,
@@ -39,16 +42,24 @@ class RobotLinkPanel(QWidget):
         *,
         default_host: str | None = None,
         default_port: int | None = None,
+        policy: EmotionPolicy | None = None,
+        calibrator: GyroCalibrator | None = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self._controller = RemoteBridgeController(face, telemetry, parent=self)
+        self._controller = RemoteBridgeController(face, telemetry, policy=policy, parent=self)
         self._controller.connectionStateChanged.connect(self._handle_state_changed)
         self._controller.remoteActiveChanged.connect(self._handle_remote_active)
         self._controller.lineReceived.connect(self._append_bridge_line)
         self._controller.errorOccurred.connect(self._handle_error)
+        self._controller.telemetryReceived.connect(self._handle_telemetry)
         self._last_host = default_host or DEFAULT_BRIDGE_HOST
         self._last_port = default_port or DEFAULT_BRIDGE_PORT
+        self._calibrator = calibrator
+        self._calibration_active = False
+        self._calibration_status: QLabel | None = None
+        self._calibration_button: QPushButton | None = None
+        self._calibration_labels: dict[str, QLabel] = {}
 
         self._host_edit = QLineEdit(self)
         self._port_spin = QSpinBox(self)
@@ -110,6 +121,9 @@ class RobotLinkPanel(QWidget):
         command_row.addWidget(self._send_button, 0)
         layout.addLayout(command_row)
 
+        if self._calibrator is not None:
+            layout.addSpacing(12)
+            layout.addWidget(self._build_calibrator_panel())
         layout.addStretch(1)
 
     def _apply_styles(self) -> None:
@@ -185,8 +199,15 @@ class RobotLinkPanel(QWidget):
         self.remoteControlChanged.emit(active)
         if active:
             self._append_message("Bridge connected")
+            if self._calibration_status is not None and not self._calibration_active:
+                self._calibration_status.setText("Link ready")
         else:
             self._append_message("Bridge inactive")
+            self._calibration_active = False
+            if self._calibration_status is not None:
+                self._calibration_status.setText("Robot link inactive")
+        if self._calibration_button is not None:
+            self._calibration_button.setEnabled(active and not self._calibration_active)
         self._emit_link_state(active)
 
     def _emit_link_state(self, active: bool) -> None:
@@ -197,6 +218,109 @@ class RobotLinkPanel(QWidget):
         self._log_view.verticalScrollBar().setValue(
             self._log_view.verticalScrollBar().maximum()
         )
+
+    # ------------------------------------------------------------------
+    # Gyro calibration helpers
+    # ------------------------------------------------------------------
+    def _build_calibrator_panel(self) -> QWidget:
+        container = QWidget(self)
+        column = QVBoxLayout(container)
+        column.setSpacing(6)
+        title = QLabel("Gyro calibration")
+        title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        column.addWidget(title)
+
+        subtitle = QLabel("Capture fresh roll/pitch/yaw baselines while the robot is resting.")
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: rgba(255,255,255,0.65); font-size: 12px;")
+        column.addWidget(subtitle)
+
+        status_row = QHBoxLayout()
+        status_row.setSpacing(6)
+        status_label = QLabel("Status:")
+        self._calibration_status = QLabel("Idle")
+        status_row.addWidget(status_label)
+        status_row.addWidget(self._calibration_status, 1)
+        column.addLayout(status_row)
+
+        action_row = QHBoxLayout()
+        action_row.setSpacing(8)
+        self._calibration_button = QPushButton("Calibrate now", self)
+        self._calibration_button.clicked.connect(self._start_calibration)
+        self._calibration_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._calibration_button.setEnabled(False)
+        action_row.addWidget(self._calibration_button)
+        column.addLayout(action_row)
+
+        offsets_title = QLabel("Current offsets")
+        offsets_title.setStyleSheet("font-size: 14px; font-weight: 500;")
+        column.addWidget(offsets_title)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(6)
+        for row, axis in enumerate(("roll", "pitch", "yaw")):
+            label = QLabel(axis.title())
+            grid.addWidget(label, row, 0)
+            value = QLabel("—")
+            value.setObjectName(f"calibration_value_{axis}")
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(value, row, 1)
+            self._calibration_labels[axis] = value
+        column.addLayout(grid)
+
+        self._update_offset_labels()
+        return container
+
+    def _start_calibration(self) -> None:
+        if self._calibrator is None:
+            return
+        if not self._controller.is_connected():
+            self._append_message("Cannot calibrate without an active link")
+            return
+        self._calibrator.reset()
+        self._calibration_active = True
+        if self._calibration_status is not None:
+            self._calibration_status.setText("Collecting samples… hold steady")
+        if self._calibration_button is not None:
+            self._calibration_button.setEnabled(False)
+        self._append_message("Calibration requested — keep the robot motionless")
+
+    def _handle_telemetry(self, sample: SensorSample) -> None:
+        if self._calibrator is None:
+            return
+        updated = self._calibrator.observe(sample)
+        if updated:
+            offsets = self._calibrator.current_offsets
+            if offsets is not None:
+                roll, pitch, yaw = offsets
+                self._append_message(
+                    f"Offsets updated (roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f})"
+                )
+            self._calibration_active = False
+            if self._calibration_status is not None:
+                self._calibration_status.setText("Offsets applied")
+            if self._calibration_button is not None and self._controller.is_connected():
+                self._calibration_button.setEnabled(True)
+            self._update_offset_labels()
+            return
+
+        if self._calibration_active and self._calibration_status is not None:
+            remaining = self._calibrator.seconds_to_window_completion()
+            if remaining is None:
+                self._calibration_status.setText("Waiting for stable readings…")
+            elif remaining <= 0:
+                self._calibration_status.setText("Stability detected… applying")
+            else:
+                self._calibration_status.setText(
+                    f"Collecting samples ({remaining:.1f}s remaining)"
+                )
+
+    def _update_offset_labels(self) -> None:
+        offsets = get_calibration_offsets()
+        for axis, label in self._calibration_labels.items():
+            value = offsets.get(axis)
+            label.setText(f"{value:.2f}°" if value is not None else "—")
 
     def shutdown(self) -> None:
         self._controller.disconnect()

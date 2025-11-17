@@ -17,7 +17,7 @@ flowchart LR
     end
 
     subgraph robot_control
-        SR["SerialReader<br/>(robot_control.serial_reader)"]
+        SR["SerialReadWriter<br/>(robot_control.serial_reader)"]
         GC["GyroCalibrator<br/>(robot_control.gyro_calibrator)"]
         SD["SensorSample dataclass<br/>(robot_control.sensor_data)"]
         FC["FaceController<br/>(robot_control.face_controller)"]
@@ -45,7 +45,7 @@ flowchart LR
 
 ## Component responsibilities
 
-- **SerialReader** continuously polls the microcontroller over UART (or a mock
+- **SerialReadWriter** continuously polls the microcontroller over UART (or a mock
   publisher in the simulator) and produces `SensorSample` objects.
 - **GyroCalibrator** watches short-term IMU stability windows and learns the
   baseline offsets that should be subtracted before feeding gyro data into the
@@ -72,3 +72,12 @@ flowchart LR
 
 Both entry points share the same widget hierarchy and overlays. Only the sensor
 source and calibration plumbing differ.
+
+## OSI-aligned runtime stack
+
+The `axon_ros.osi` helpers let each entry point describe which component maps to
+each OSI layer. The robot runtime, for example, registers the UART transport as
+the **Physical** layer, the TCP bridge as the **Transport** layer, the Qt
+polling loop as the **Session** layer, and the PySide windows as the
+**Application** layer. This light-weight bookkeeping improves observability
+today and primes the project for ROS nodes that may eventually back each layer.

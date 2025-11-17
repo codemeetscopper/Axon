@@ -12,8 +12,8 @@ from .sensor_data import SensorSample
 LOGGER = logging.getLogger(__name__)
 
 
-class SerialReader:
-    """Read :class:`SensorSample` objects from a serial port on a background thread."""
+class SerialReadWriter:
+    """Bidirectional serial transport that exposes reader/writer helpers."""
 
     def __init__(
         self,
@@ -35,6 +35,9 @@ class SerialReader:
         self._error: Optional[Exception] = None
         self._line_consumers: list[Callable[[str], None]] = []
 
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
     def start(self) -> None:
         """Start draining telemetry from the serial port on a dedicated thread."""
 
@@ -42,7 +45,11 @@ class SerialReader:
             return
 
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, name="SerialReader", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run,
+            name="SerialReadWriter",
+            daemon=True,
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -58,6 +65,11 @@ class SerialReader:
         self._close_serial()
         self._closed = True
 
+    close = stop
+
+    # ------------------------------------------------------------------
+    # Reading + writing
+    # ------------------------------------------------------------------
     def pop_latest(self) -> Optional[SensorSample]:
         """Return the latest unread sample, if one is available."""
 
@@ -77,6 +89,9 @@ class SerialReader:
             self._serial.write(data)
             self._serial.flush()
 
+    # ------------------------------------------------------------------
+    # Diagnostics + hooks
+    # ------------------------------------------------------------------
     def has_error(self) -> bool:
         return self._error is not None
 
@@ -93,6 +108,9 @@ class SerialReader:
             if consumer in self._line_consumers:
                 self._line_consumers.remove(consumer)
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
     def _run(self) -> None:
         try:
             while not self._stop_event.is_set():
@@ -150,7 +168,8 @@ class SerialReader:
         except SerialException:  # pragma: no cover - hardware specific
             LOGGER.debug("Failed to close serial port cleanly")
 
-    def close(self) -> None:
-        """Alias for :meth:`stop` for backwards compatibility."""
 
-        self.stop()
+class SerialReader(SerialReadWriter):
+    """Backwards-compatible alias that preserves the previous API name."""
+
+    pass

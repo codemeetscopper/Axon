@@ -25,8 +25,11 @@ class GyroCalibrator:
         self._samples: Deque[Tuple[float, float, float, float]] = deque()
         self._current_offsets: Tuple[float, float, float] | None = None
 
-    def observe(self, sample: SensorSample, timestamp: float | None = None) -> None:
-        """Record *sample* and update the baseline when it rests for the window."""
+    def observe(self, sample: SensorSample, timestamp: float | None = None) -> bool:
+        """Record *sample* and update the baseline when it rests for the window.
+
+        Returns ``True`` when a new set of offsets is applied.
+        """
 
         if timestamp is None:
             timestamp = monotonic()
@@ -35,18 +38,41 @@ class GyroCalibrator:
         self._prune(timestamp)
 
         if not self._has_full_window(timestamp):
-            return
+            return False
 
         if not self._is_stable():
-            return
+            return False
 
         offsets = self._window_average()
         if self._current_offsets and self._offsets_close(offsets, self._current_offsets):
-            return
+            return False
 
         self._current_offsets = offsets
         roll, pitch, yaw = offsets
         set_calibration_offsets(roll=roll, pitch=pitch, yaw=yaw)
+        return True
+
+    def reset(self, *, forget_offsets: bool = False) -> None:
+        """Clear the sliding window so a fresh baseline can be captured."""
+
+        self._samples.clear()
+        if forget_offsets:
+            self._current_offsets = None
+
+    @property
+    def current_offsets(self) -> Tuple[float, float, float] | None:
+        return self._current_offsets
+
+    def seconds_to_window_completion(self, now: float | None = None) -> float | None:
+        """Return the estimated number of seconds left before the window is full."""
+
+        if not self._samples:
+            return self._window
+        if now is None:
+            now = monotonic()
+        oldest = self._samples[0][0]
+        remaining = self._window - max(0.0, now - oldest)
+        return max(0.0, remaining)
 
     # ------------------------------------------------------------------
     # Helpers

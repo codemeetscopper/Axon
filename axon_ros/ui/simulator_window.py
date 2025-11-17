@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget, QHBoxLayout
 
@@ -10,13 +12,25 @@ from axon_ros.ui.robot_link_panel import RobotLinkPanel
 from axon_ros.ui.face_telemetry_display import FaceTelemetryDisplay
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
 
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from robot_control import EmotionPolicy, GyroCalibrator
+
 
 class SimulatorMainWindow(QWidget):
-    def __init__(self, *, bridge_host: str | None = None, bridge_port: int | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        bridge_host: str | None = None,
+        bridge_port: int | None = None,
+        policy: "EmotionPolicy" | None = None,
+        calibrator: "GyroCalibrator" | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Robotic Face Widget")
         self._bridge_host = bridge_host
         self._bridge_port = bridge_port
+        self._policy = policy
+        self._calibrator = calibrator
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -41,6 +55,8 @@ class SimulatorMainWindow(QWidget):
             self.telemetry,
             default_host=self._bridge_host,
             default_port=self._bridge_port,
+            policy=self._policy,
+            calibrator=self._calibrator,
         )
         self.robot_link_panel.remoteControlChanged.connect(self._handle_remote_toggle)
         self.robot_link_panel.linkStateChanged.connect(self._handle_remote_link_state)
