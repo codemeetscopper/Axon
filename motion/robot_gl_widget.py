@@ -36,7 +36,7 @@ class StlLoader(QObject):
             self.finished.emit(None, None, 1.0)
 
 class RobotGLWidget(QOpenGLWidget):
-    def __init__(self, parent=None, stl_path=None, scale=1.0):
+    def __init__(self, parent=None, stl_path=None, scale=1.4):
         super().__init__(parent)
         self.x_rot = 0
         self.y_rot = 0
@@ -52,9 +52,9 @@ class RobotGLWidget(QOpenGLWidget):
         self.load_error = None
         
         # Mesh Orientation Offsets (Configurable)
-        self.mesh_rot_x = 180
-        self.mesh_rot_y = 90
-        self.mesh_rot_z = 180
+        self.mesh_rot_x = 0
+        self.mesh_rot_y = 0
+        self.mesh_rot_z = 0
         
         if stl_path:
             self.start_loading(stl_path)
@@ -90,9 +90,9 @@ class RobotGLWidget(QOpenGLWidget):
         glScalef(final_scale, final_scale, final_scale)
         
         # Apply Mesh Orientation Offsets (Configurable)
-        glRotatef(self.mesh_rot_x, 1, 0, 0)
-        glRotatef(self.mesh_rot_y, 0, 1, 0)
-        glRotatef(self.mesh_rot_z, 0, 0, 1)
+        # glRotatef(self.mesh_rot_x, 1, 0, 0)
+        # glRotatef(self.mesh_rot_y, 0, 1, 0)
+        # glRotatef(self.mesh_rot_z, 0, 0, 1)
         
         # Center the mesh
         glTranslatef(-self.center_offset[0], -self.center_offset[1], -self.center_offset[2])
