@@ -51,6 +51,7 @@ class SerialReadWriter:
             daemon=True,
         )
         self._thread.start()
+        self.send_command('{"T": 131, "cmd": 1}')
 
     def stop(self) -> None:
         """Stop the background reader and close the serial port."""
