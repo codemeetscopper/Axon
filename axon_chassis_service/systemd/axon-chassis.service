@@ -1,0 +1,15 @@
+[Unit]
+Description=Axon Chassis Bridge Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/axon_chassis_service
+ExecStart=/home/pi/axon_chassis_service/venv/bin/python -m axon_chassis_service.main --config /home/pi/axon_chassis_service/config/axon_bridge.yaml
+Restart=on-failure
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
