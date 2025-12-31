@@ -67,8 +67,13 @@ async def run_service(config_path: Path | None) -> None:
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
 
-    for sig in ("SIGINT", "SIGTERM"):
-        loop.add_signal_handler(getattr(__import__("signal"), sig), stop_event.set)
+    try:
+        import signal
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop_event.set)
+    except (ImportError, NotImplementedError):
+        logger.warning("Signal handlers unavailable; running without OS signal support")
 
     await stop_event.wait()
 

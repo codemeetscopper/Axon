@@ -37,6 +37,16 @@ source /home/pi/axon_chassis_service/venv/bin/activate
 python -m axon_chassis_service.main --config /home/pi/axon_chassis_service/config/axon_bridge.yaml
 ```
 
+## Launcher Scripts
+
+Single-file launchers are provided for common modes:
+
+```bash
+python /home/pi/axon_chassis_service/tools/run_bridge_real.py
+python /home/pi/axon_chassis_service/tools/run_bridge_sim.py
+python /home/pi/axon_chassis_service/tools/run_mock_gui.py
+```
+
 ## TCP Protocol
 
 Line-delimited JSON messages over TCP.
