@@ -10,7 +10,7 @@ from .controller import PanTiltController
 @dataclass(slots=True)
 class GimbalConfig:
     neutral_pan: float = 90.0
-    neutral_tilt: float = 90.0
+    neutral_tilt: float = 70.0
     min_pan: float = 0.0
     max_pan: float = 180.0
     min_tilt: float = 60.0

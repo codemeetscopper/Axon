@@ -37,7 +37,7 @@ class PanTiltController:
         self._pca.frequency = frequency_hz
 
         self._pan_angle = 90.0
-        self._tilt_angle = 90.0
+        self._tilt_angle = 70.0
 
     def close(self) -> None:
         try:
