@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QTimer
 
 from robot_control import FaceController, SerialReadWriter
+
+if TYPE_CHECKING:
+    from panandtilt import PanTiltGimbalController
 from robot_control.gyro_calibrator import GyroCalibrator
 from robot_control.serial_bridge_server import SerialBridgeServer
 from axon_ui import TelemetryPanel
@@ -23,6 +26,7 @@ class RobotRuntime(QObject):
         poll_interval_ms: int = 40,
         calibrator: GyroCalibrator | None = None,
         bridge: SerialBridgeServer | None = None,
+        gimbal_controller: PanTiltGimbalController | None = None,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
@@ -36,6 +40,7 @@ class RobotRuntime(QObject):
         self._missed_cycles = 0
         self._running = False
         self._bridge = bridge
+        self._gimbal_controller = gimbal_controller
 
     def start(self) -> None:
         if self._running:
@@ -51,12 +56,16 @@ class RobotRuntime(QObject):
             self._reader.stop()
             if self._bridge is not None:
                 self._bridge.stop()
+            if self._gimbal_controller is not None:
+                self._gimbal_controller.close()
             return
         self._running = False
         self._timer.stop()
         self._reader.stop()
         if self._bridge is not None:
             self._bridge.stop()
+        if self._gimbal_controller is not None:
+            self._gimbal_controller.close()
 
     def _poll(self) -> None:
         sample = self._reader.pop_latest()
@@ -69,6 +78,8 @@ class RobotRuntime(QObject):
         self._missed_cycles = 0
         self._calibrator.observe(sample)
         self._controller.apply_sample(sample)
+        if self._gimbal_controller is not None:
+            self._gimbal_controller.apply_sample(sample)
         self._telemetry.update_sample(sample)
         if self._bridge is not None:
             self._bridge.publish_sample(sample)
