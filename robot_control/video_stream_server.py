@@ -112,7 +112,7 @@ class VideoStreamServer:
                     if capture is not None:
                         capture.release()
                     capture = self._open_capture()
-                    time.sleep(0.2)
+                    # time.sleep(0.2)
                     continue
 
                 ok, frame = capture.read()
