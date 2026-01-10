@@ -97,6 +97,10 @@ class SerialBridgeServer:
                     client, address = sock.accept()
                 except socket.timeout:
                     continue
+                except OSError:
+                    if self._stop_event.is_set():
+                        break
+                    continue
                 thread = threading.Thread(
                     target=self._handle_client,
                     args=(client, address),
