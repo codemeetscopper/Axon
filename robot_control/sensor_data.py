@@ -80,6 +80,10 @@ class SensorSample:
         sources interchangeably.
         """
 
+        imu = payload.get("imu")
+        if not isinstance(imu, Mapping):
+            imu = {}
+
         def _lookup(*names: str, default: float | int = 0.0, required: bool = False) -> float | int:
             for name in names:
                 if name in payload:
@@ -88,15 +92,23 @@ class SensorSample:
                 raise KeyError(f"Missing required telemetry field: {names[0]}")
             return default
 
+        def _lookup_imu(axis: str, *names: str, default: float | int = 0.0) -> float | int:
+            value = _lookup(*names, default=None)
+            if value is not None:
+                return value
+            if axis in imu:
+                return imu[axis]
+            return default
+
         return cls(
             message_type=int(_lookup("message_type", "T", required=True)),
             left_speed=float(_lookup("left_speed", "L")),
             right_speed=float(_lookup("right_speed", "R")),
-            roll=float(_lookup("roll", "r")),
-            pitch=float(_lookup("pitch", "p")),
-            yaw=float(_lookup("yaw", "y")),
+            roll=float(_lookup_imu("roll", "roll", "r")),
+            pitch=float(_lookup_imu("pitch", "pitch", "p")),
+            yaw=float(_lookup_imu("yaw", "yaw", "y")),
             temperature_c=float(_lookup("temperature_c", "temp")),
-            voltage_v=float(_lookup("voltage_v", "v")),
+            voltage_v=float(_lookup("voltage_v", "v", "battery")),
         )
 
     def to_orientation(self) -> Dict[str, float]:
@@ -123,7 +135,7 @@ class SensorSample:
 
     @property
     def is_robot_frame(self) -> bool:
-        return self.message_type == 1001
+        return self.message_type in {1001, 130}
 
     def as_dict(self) -> Dict[str, Any]:
         """Expose the raw values for convenience when displaying telemetry."""
