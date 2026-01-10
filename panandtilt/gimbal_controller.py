@@ -11,8 +11,10 @@ from .controller import PanTiltController
 class GimbalConfig:
     neutral_pan: float = 90.0
     neutral_tilt: float = 90.0
-    max_pan_offset: float = 45.0
-    max_tilt_offset: float = 45.0
+    min_pan: float = 0.0
+    max_pan: float = 180.0
+    min_tilt: float = 60.0
+    max_tilt: float = 180.0
     yaw_gain: float = 1.0
     pitch_gain: float = 1.0
     smoothing: float = 0.2
@@ -41,16 +43,8 @@ class PanTiltGimbalController:
         target_pan = self._config.neutral_pan + (-yaw * self._config.yaw_gain)
         target_tilt = self._config.neutral_tilt + (-pitch * self._config.pitch_gain)
 
-        target_pan = self._clamp(
-            target_pan,
-            self._config.neutral_pan - self._config.max_pan_offset,
-            self._config.neutral_pan + self._config.max_pan_offset,
-        )
-        target_tilt = self._clamp(
-            target_tilt,
-            self._config.neutral_tilt - self._config.max_tilt_offset,
-            self._config.neutral_tilt + self._config.max_tilt_offset,
-        )
+        target_pan = self._clamp(target_pan, self._config.min_pan, self._config.max_pan)
+        target_tilt = self._clamp(target_tilt, self._config.min_tilt, self._config.max_tilt)
 
         alpha = self._config.smoothing
         self._pan = self._pan + alpha * (target_pan - self._pan)
