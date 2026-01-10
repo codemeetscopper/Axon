@@ -1,89 +1,148 @@
 from __future__ import annotations
 
 import json
+import logging
+import socket
 import struct
+import threading
+import time
 from typing import Optional
 
-from PySide6.QtCore import QObject, QBuffer, QIODevice, Slot
-from PySide6.QtNetwork import QAbstractSocket, QHostAddress, QTcpServer, QTcpSocket
+import cv2
+
+LOGGER = logging.getLogger(__name__)
 
 
-class VideoStreamServer(QObject):
+class VideoStreamServer:
     def __init__(
         self,
         host: str = "0.0.0.0",
         port: int = 8770,
-        parent: Optional[QObject] = None,
+        device_index: int = 0,
+        width: int = 640,
+        height: int = 480,
+        fps: int = 30,
     ) -> None:
-        super().__init__(parent)
         self._host = host
         self._port = port
-        self._server = QTcpServer(self)
-        self._server.newConnection.connect(self._handle_connection)
-        self._clients: dict[QTcpSocket, bytearray] = {}
+        self._device_index = device_index
+        self._width = width
+        self._height = height
+        self._fps = fps
         self._quality = 70
 
-        self._camera = None
-        self._capture_session = None
-        self._video_sink = None
+        self._server_socket: Optional[socket.socket] = None
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._clients: dict[socket.socket, bytearray] = {}
+        self._clients_lock = threading.Lock()
 
     def start(self) -> bool:
-        if self._server.isListening():
+        if self._thread and self._thread.is_alive():
             return True
-        if self._camera is None:
-            from PySide6.QtMultimedia import QCamera, QMediaCaptureSession, QVideoSink
+        try:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind((self._host, self._port))
+            server_socket.listen()
+            server_socket.settimeout(0.5)
+            self._server_socket = server_socket
+        except OSError as exc:
+            LOGGER.warning("Video stream server failed to bind: %s", exc)
+            return False
 
-            self._camera = QCamera()
-            self._capture_session = QMediaCaptureSession()
-            self._video_sink = QVideoSink()
-            self._capture_session.setCamera(self._camera)
-            self._capture_session.setVideoSink(self._video_sink)
-            self._video_sink.videoFrameChanged.connect(self._on_frame)
-        started = self._server.listen(QHostAddress(self._host), self._port)
-        if started:
-            self._camera.start()
-        return started
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, name="VideoStreamServer", daemon=True)
+        self._thread.start()
+        return True
 
     def stop(self) -> None:
-        if self._server.isListening():
-            self._server.close()
-        for client in list(self._clients.keys()):
-            client.disconnectFromHost()
-            client.close()
-        self._clients.clear()
-        if self._camera is not None:
-            self._camera.stop()
+        self._stop_event.set()
+        if self._server_socket is not None:
+            try:
+                self._server_socket.close()
+            except OSError:
+                pass
+        with self._clients_lock:
+            for client in list(self._clients.keys()):
+                try:
+                    client.close()
+                except OSError:
+                    pass
+            self._clients.clear()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=1.0)
 
-    @Slot()
-    def _handle_connection(self) -> None:
-        while self._server.hasPendingConnections():
-            client = self._server.nextPendingConnection()
-            if client is None:
-                break
-            client.readyRead.connect(lambda c=client: self._handle_ready_read(c))
-            client.disconnected.connect(lambda c=client: self._drop_client(c))
-            client.setSocketOption(QAbstractSocket.SocketOption.LowDelayOption, 1)
-            self._clients[client] = bytearray()
+    def _run(self) -> None:
+        capture = cv2.VideoCapture(self._device_index)
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(self._width))
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self._height))
+        capture.set(cv2.CAP_PROP_FPS, float(self._fps))
+        frame_interval = 1.0 / max(self._fps, 1)
+        try:
+            while not self._stop_event.is_set():
+                self._accept_clients()
+                self._read_controls()
 
-    def _drop_client(self, client: QTcpSocket) -> None:
-        if client in self._clients:
-            self._clients.pop(client, None)
-        client.close()
+                ok, frame = capture.read()
+                if not ok:
+                    time.sleep(0.1)
+                    continue
+                result, encoded = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), int(self._quality)],
+                )
+                if not result:
+                    continue
 
-    def _handle_ready_read(self, client: QTcpSocket) -> None:
-        buffer = self._clients.get(client)
-        if buffer is None:
+                payload = encoded.tobytes()
+                header = b"FRAM" + struct.pack("!I", len(payload))
+                data = header + payload
+                self._broadcast(data)
+                time.sleep(frame_interval)
+        finally:
+            capture.release()
+
+    def _accept_clients(self) -> None:
+        if self._server_socket is None:
             return
-        buffer.extend(client.readAll().data())
-        while len(buffer) >= 8:
-            message_type = bytes(buffer[:4])
-            length = struct.unpack("!I", buffer[4:8])[0]
-            if len(buffer) < 8 + length:
+        while not self._stop_event.is_set():
+            try:
+                client, _address = self._server_socket.accept()
+            except socket.timeout:
                 break
-            payload = bytes(buffer[8 : 8 + length])
-            del buffer[: 8 + length]
-            if message_type == b"CTRL":
-                self._apply_control(payload)
+            except OSError:
+                return
+            client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            client.setblocking(False)
+            with self._clients_lock:
+                self._clients[client] = bytearray()
+
+    def _read_controls(self) -> None:
+        with self._clients_lock:
+            clients = list(self._clients.items())
+        for client, buffer in clients:
+            try:
+                chunk = client.recv(4096)
+            except BlockingIOError:
+                continue
+            except OSError:
+                self._drop_client(client)
+                continue
+            if not chunk:
+                self._drop_client(client)
+                continue
+            buffer.extend(chunk)
+            while len(buffer) >= 8:
+                message_type = bytes(buffer[:4])
+                length = struct.unpack("!I", buffer[4:8])[0]
+                if len(buffer) < 8 + length:
+                    break
+                payload = bytes(buffer[8 : 8 + length])
+                del buffer[: 8 + length]
+                if message_type == b"CTRL":
+                    self._apply_control(payload)
 
     def _apply_control(self, payload: bytes) -> None:
         try:
@@ -94,21 +153,20 @@ class VideoStreamServer(QObject):
         if isinstance(quality, int):
             self._quality = max(10, min(95, quality))
 
-    @Slot()
-    def _on_frame(self, frame) -> None:
-        if not self._clients:
-            return
-        image = frame.toImage()
-        if image.isNull():
-            return
-        buffer = QBuffer()
-        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-        image.save(buffer, "JPEG", self._quality)
-        payload = bytes(buffer.data())
-        header = b"FRAM" + struct.pack("!I", len(payload))
-        data = header + payload
-        for client in list(self._clients.keys()):
-            if client.state() != QAbstractSocket.SocketState.ConnectedState:
+    def _broadcast(self, data: bytes) -> None:
+        with self._clients_lock:
+            clients = list(self._clients.keys())
+        for client in clients:
+            try:
+                client.sendall(data)
+            except OSError:
                 self._drop_client(client)
-                continue
-            client.write(data)
+
+    def _drop_client(self, client: socket.socket) -> None:
+        with self._clients_lock:
+            if client in self._clients:
+                self._clients.pop(client, None)
+        try:
+            client.close()
+        except OSError:
+            pass

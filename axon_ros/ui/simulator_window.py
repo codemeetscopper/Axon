@@ -129,7 +129,12 @@ class SimulatorMainWindow(QWidget):
         # Visualization Config Panel
         self.viz_config = VizConfigPanel()
         self.viz_config.configChanged.connect(self.robot_gl.set_mesh_transform)
-        self.video_panel = VideoStreamPanel(self.video_viewer)
+        video_host = self._bridge_host or "127.0.0.1"
+        self.video_panel = VideoStreamPanel(
+            self.video_viewer,
+            default_host=video_host,
+            default_port=8770,
+        )
 
         tabs = QTabWidget()
         tabs.addTab(self.control_panel, "Simulator")

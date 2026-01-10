@@ -120,13 +120,21 @@ class VideoStreamViewer(QGroupBox):
 
 
 class VideoStreamPanel(QWidget):
-    def __init__(self, viewer: VideoStreamViewer, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        viewer: VideoStreamViewer,
+        parent: Optional[QWidget] = None,
+        default_host: str = "127.0.0.1",
+        default_port: int = 8770,
+    ) -> None:
         super().__init__(parent)
         self._viewer = viewer
         self._client = VideoStreamClient(self)
         self._client.frame_received.connect(self._viewer.update_frame)
         self._client.connection_changed.connect(self._handle_connection)
         self._client.error_message.connect(self._handle_error)
+        self._default_host = default_host
+        self._default_port = default_port
         self._build_ui()
 
     def shutdown(self) -> None:
@@ -138,8 +146,8 @@ class VideoStreamPanel(QWidget):
 
         connection_box = QGroupBox("USB camera stream")
         connection_layout = QFormLayout(connection_box)
-        self._host_input = QLineEdit("127.0.0.1")
-        self._port_input = QLineEdit("8770")
+        self._host_input = QLineEdit(self._default_host)
+        self._port_input = QLineEdit(str(self._default_port))
         self._status_label = QLabel("Disconnected")
         self._status_label.setStyleSheet("color: #d65c5c; font-weight: bold;")
         self._connect_button = QPushButton("Connect")

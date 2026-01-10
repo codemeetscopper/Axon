@@ -40,28 +40,25 @@ def _configure_logging(level: str) -> None:
     )
 
 
-def _schedule_video_stream(app: QApplication, stack: OsiStack) -> None:
-    def _start() -> None:
-        from robot_control.video_stream_server import VideoStreamServer
+def _start_video_stream(app: QApplication, stack: OsiStack) -> None:
+    from robot_control.video_stream_server import VideoStreamServer
 
-        server = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
-        stack.register(
-            OsiLayer.TRANSPORT,
-            "VideoStreamServer",
-            server,
-            description="USB camera stream",
+    server = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
+    stack.register(
+        OsiLayer.TRANSPORT,
+        "VideoStreamServer",
+        server,
+        description="USB camera stream",
+    )
+    if server.start():
+        LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
+    else:
+        LOGGER.warning(
+            "Video stream server failed to start on %s:%s",
+            DEFAULT_BRIDGE_HOST,
+            DEFAULT_VIDEO_PORT,
         )
-        if server.start():
-            LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
-        else:
-            LOGGER.warning(
-                "Video stream server failed to start on %s:%s",
-                DEFAULT_BRIDGE_HOST,
-                DEFAULT_VIDEO_PORT,
-            )
-        app.aboutToQuit.connect(server.stop)
-
-    QTimer.singleShot(0, _start)
+    app.aboutToQuit.connect(server.stop)
 
 
 def main() -> int:
@@ -111,7 +108,7 @@ def main() -> int:
     if apply_palette is not None:
         apply_palette(app)
 
-    _schedule_video_stream(app, stack)
+    _start_video_stream(app, stack)
 
     face = RoboticFaceWidget()
     policy = EmotionPolicy()
