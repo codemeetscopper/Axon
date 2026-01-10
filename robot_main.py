@@ -86,6 +86,21 @@ def main() -> int:
     if apply_palette is not None:
         apply_palette(app)
 
+    video_stream = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
+    if video_stream.start():
+        stack.register(
+            OsiLayer.TRANSPORT,
+            "VideoStreamServer",
+            video_stream,
+            description="USB camera stream",
+        )
+    else:
+        LOGGER.warning(
+            "Video stream server failed to start on %s:%s",
+            DEFAULT_BRIDGE_HOST,
+            DEFAULT_VIDEO_PORT,
+        )
+
     face = RoboticFaceWidget()
     policy = EmotionPolicy()
     calibrator = GyroCalibrator()
