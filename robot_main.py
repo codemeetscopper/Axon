@@ -51,7 +51,8 @@ def _start_video_stream(app: QApplication, stack: OsiStack) -> None:
         description="USB camera stream",
     )
     if server.start():
-        LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
+        port = server.bound_port or DEFAULT_VIDEO_PORT
+        LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, port)
     else:
         LOGGER.warning(
             "Video stream server failed to start on %s:%s",

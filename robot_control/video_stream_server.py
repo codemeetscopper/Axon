@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import logging
 import socket
@@ -36,20 +37,41 @@ class VideoStreamServer:
         self._stop_event = threading.Event()
         self._clients: dict[socket.socket, bytearray] = {}
         self._clients_lock = threading.Lock()
+        self._bound_port: Optional[int] = None
+
+    @property
+    def bound_port(self) -> Optional[int]:
+        return self._bound_port
 
     def start(self) -> bool:
         if self._thread and self._thread.is_alive():
             return True
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            try:
+                server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except OSError:
+                pass
         try:
-            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_socket.bind((self._host, self._port))
-            server_socket.listen()
-            server_socket.settimeout(0.5)
-            self._server_socket = server_socket
         except OSError as exc:
-            LOGGER.warning("Video stream server failed to bind: %s", exc)
-            return False
+            if exc.errno == errno.EADDRINUSE:
+                LOGGER.warning("Video stream port %s in use; selecting a free port.", self._port)
+                try:
+                    server_socket.bind((self._host, 0))
+                except OSError as bind_exc:
+                    LOGGER.warning("Video stream server failed to bind: %s", bind_exc)
+                    server_socket.close()
+                    return False
+            else:
+                LOGGER.warning("Video stream server failed to bind: %s", exc)
+                server_socket.close()
+                return False
+        server_socket.listen()
+        server_socket.settimeout(0.5)
+        self._server_socket = server_socket
+        self._bound_port = server_socket.getsockname()[1]
 
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run, name="VideoStreamServer", daemon=True)
@@ -63,6 +85,7 @@ class VideoStreamServer:
                 self._server_socket.close()
             except OSError:
                 pass
+        self._bound_port = None
         with self._clients_lock:
             for client in list(self._clients.keys()):
                 try:
