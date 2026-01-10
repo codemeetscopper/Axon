@@ -22,8 +22,8 @@ class VideoStreamServer:
         port: int = 8770,
         device_index: int | None = 0,
         device_path: str | None = None,
-        width: int = 640,
-        height: int = 480,
+        width: int = 320,
+        height: int = 240,
         fps: int = 30,
     ) -> None:
         self._host = host
@@ -33,7 +33,7 @@ class VideoStreamServer:
         self._width = width
         self._height = height
         self._fps = fps
-        self._quality = 70
+        self._quality = 10
 
         self._server_socket: Optional[socket.socket] = None
         self._thread: Optional[threading.Thread] = None
