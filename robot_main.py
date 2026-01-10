@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from axon_ros.osi import OsiLayer, OsiStack, describe_stack
 from axon_ros.runtime import RobotMainWindow, RobotRuntime
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
+from panandtilt import PanTiltController, PanTiltGimbalController
 from robot_control import EmotionPolicy, FaceController, GyroCalibrator, SerialReadWriter
 from robot_control.serial_bridge_config import SerialBridgeConfig
 from robot_control.serial_bridge_server import SerialBridgeServer
@@ -77,6 +78,12 @@ def main() -> int:
     policy = EmotionPolicy()
     calibrator = GyroCalibrator()
     controller = FaceController(face, policy)
+    gimbal_controller = None
+    try:
+        gimbal_controller = PanTiltGimbalController(PanTiltController())
+        stack.register(OsiLayer.PRESENTATION, "PanTiltGimbalController", gimbal_controller)
+    except Exception as exc:
+        LOGGER.warning("Pan/tilt controller unavailable: %s", exc)
     telemetry = TelemetryPanel()
     info_panel = InfoPanel()
     window = RobotMainWindow(face, (info_panel, telemetry))
@@ -91,6 +98,7 @@ def main() -> int:
         poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
         calibrator=calibrator,
         bridge=bridge,
+        gimbal_controller=gimbal_controller,
     )
     stack.register(
         OsiLayer.SESSION,
