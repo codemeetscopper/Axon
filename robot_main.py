@@ -5,14 +5,17 @@ import signal
 import sys
 import time
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from axon_ros.osi import OsiLayer, OsiStack, describe_stack
 from axon_ros.runtime import RobotMainWindow, RobotRuntime
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
+from panandtilt import PanTiltController, PanTiltGimbalController
 from robot_control import EmotionPolicy, FaceController, GyroCalibrator, SerialReadWriter
 from robot_control.serial_bridge_config import SerialBridgeConfig
 from robot_control.serial_bridge_server import SerialBridgeServer
+from robot_control.video_stream_server import VideoStreamServer
 
 try:  # Reuse the palette from the interactive demo when available.
     from axon_ui import apply_dark_palette as apply_palette
@@ -27,6 +30,7 @@ DEFAULT_POLL_INTERVAL_MS = 40
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_BRIDGE_HOST = "0.0.0.0"
 DEFAULT_BRIDGE_PORT = 8765
+DEFAULT_VIDEO_PORT = 8770
 
 
 def _configure_logging(level: str) -> None:
@@ -34,6 +38,17 @@ def _configure_logging(level: str) -> None:
         level=getattr(logging, level.upper(), logging.INFO),
         format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
     )
+
+
+def _start_video_stream(server: VideoStreamServer) -> None:
+    if server.start():
+        LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
+    else:
+        LOGGER.warning(
+            "Video stream server failed to start on %s:%s",
+            DEFAULT_BRIDGE_HOST,
+            DEFAULT_VIDEO_PORT,
+        )
 
 
 def main() -> int:
@@ -73,10 +88,25 @@ def main() -> int:
     if apply_palette is not None:
         apply_palette(app)
 
+    video_stream = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
+    stack.register(
+        OsiLayer.TRANSPORT,
+        "VideoStreamServer",
+        video_stream,
+        description="USB camera stream",
+    )
+    QTimer.singleShot(0, lambda: _start_video_stream(video_stream))
+
     face = RoboticFaceWidget()
     policy = EmotionPolicy()
     calibrator = GyroCalibrator()
     controller = FaceController(face, policy)
+    gimbal_controller = None
+    try:
+        gimbal_controller = PanTiltGimbalController(PanTiltController())
+        stack.register(OsiLayer.PRESENTATION, "PanTiltGimbalController", gimbal_controller)
+    except Exception as exc:
+        LOGGER.warning("Pan/tilt controller unavailable: %s", exc)
     telemetry = TelemetryPanel()
     info_panel = InfoPanel()
     window = RobotMainWindow(face, (info_panel, telemetry))
@@ -91,6 +121,7 @@ def main() -> int:
         poll_interval_ms=DEFAULT_POLL_INTERVAL_MS,
         calibrator=calibrator,
         bridge=bridge,
+        gimbal_controller=gimbal_controller,
     )
     stack.register(
         OsiLayer.SESSION,
@@ -99,6 +130,7 @@ def main() -> int:
         description="Qt polling loop",
     )
     app.aboutToQuit.connect(runtime.stop)
+    app.aboutToQuit.connect(video_stream.stop)
 
     LOGGER.info("%s", describe_stack(stack))
 
