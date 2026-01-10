@@ -20,11 +20,13 @@ class SerialReadWriter:
         port: str,
         baudrate: int = 115200,
         timeout: float = 0.05,
+        reconnect_delay_s: float = 1.0,
     ) -> None:
-        try:
-            self._serial = serial.Serial(port=port, baudrate=baudrate, timeout=timeout)
-        except SerialException as exc:  # pragma: no cover - hardware specific
-            raise RuntimeError(f"Unable to open serial port {port!r}: {exc}") from exc
+        self._port = port
+        self._baudrate = baudrate
+        self._timeout = timeout
+        self._reconnect_delay_s = reconnect_delay_s
+        self._serial = self._open_serial()
 
         self._lock = threading.Lock()
         self._listeners_lock = threading.Lock()
@@ -34,6 +36,10 @@ class SerialReadWriter:
         self._closed = False
         self._error: Optional[Exception] = None
         self._line_consumers: list[Callable[[str], None]] = []
+        self._init_commands = [
+            '{"T": 131, "cmd": 1}',
+            '{"T": 130}',
+        ]
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -51,7 +57,7 @@ class SerialReadWriter:
             daemon=True,
         )
         self._thread.start()
-        self.send_command('{"T": 131, "cmd": 1}')
+        self._send_init_commands()
 
     def stop(self) -> None:
         """Stop the background reader and close the serial port."""
@@ -120,7 +126,9 @@ class SerialReadWriter:
                 except SerialException as exc:  # pragma: no cover - hardware specific
                     self._error = exc
                     LOGGER.error("Serial connection lost: %s", exc)
-                    break
+                    if not self._reconnect():
+                        break
+                    continue
 
                 if not raw:
                     continue
@@ -168,6 +176,41 @@ class SerialReadWriter:
             self._serial.close()
         except SerialException:  # pragma: no cover - hardware specific
             LOGGER.debug("Failed to close serial port cleanly")
+
+    def _open_serial(self) -> serial.Serial:
+        try:
+            return serial.Serial(
+                port=self._port,
+                baudrate=self._baudrate,
+                timeout=self._timeout,
+            )
+        except SerialException as exc:  # pragma: no cover - hardware specific
+            raise RuntimeError(f"Unable to open serial port {self._port!r}: {exc}") from exc
+
+    def _reconnect(self) -> bool:
+        if self._closed or self._stop_event.is_set():
+            return False
+        self._close_serial()
+        while not self._stop_event.is_set():
+            try:
+                self._serial = self._open_serial()
+            except RuntimeError as exc:
+                self._error = exc
+                LOGGER.warning("Serial reconnect failed; retrying in %.1fs", self._reconnect_delay_s)
+                self._stop_event.wait(self._reconnect_delay_s)
+                continue
+            self._error = None
+            LOGGER.info("Serial reconnected on %s", self._port)
+            self._send_init_commands()
+            return True
+        return False
+
+    def _send_init_commands(self) -> None:
+        for command in self._init_commands:
+            try:
+                self.send_command(command)
+            except Exception as exc:
+                LOGGER.warning("Failed to send init command %s: %s", command, exc)
 
 
 class SerialReader(SerialReadWriter):

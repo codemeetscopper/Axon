@@ -13,6 +13,7 @@ from axon_ros.ui.control_panel import ControlPanel
 from axon_ros.ui.robot_link_panel import RobotLinkPanel
 from axon_ros.ui.face_telemetry_display import FaceTelemetryDisplay
 from axon_ros.ui.viz_config_panel import VizConfigPanel
+from axon_ros.ui.video_stream_panel import VideoStreamPanel, VideoStreamViewer
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
 
 if TYPE_CHECKING:  # pragma: no cover - type hints only
@@ -83,20 +84,18 @@ class SimulatorMainWindow(QWidget):
         gl_layout.setSpacing(0)
         
         # Create 3D viewer
-        # Load default.stl from the same directory as this file
-        import os
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        stl_path = os.path.join(current_dir, "default.stl")
-        
-        self.robot_gl = RobotGLWidget(stl_path=stl_path, scale=0.8)
+        self.robot_gl = RobotGLWidget(scale=0.8)
         self.robot_gl.setMinimumHeight(250)
         # Round corners for the GL widget itself if possible, or just let container handle it
         # OpenGL widgets can be tricky with border-radius, so we rely on the container frame
         
         gl_layout.addWidget(self.robot_gl)
         
+        self.video_viewer = VideoStreamViewer()
+
         viz_layout.addWidget(display, 3)
         viz_layout.addWidget(gl_container, 2)
+        viz_layout.addWidget(self.video_viewer, 2)
         
         self.splitter.addWidget(viz_container)
 
@@ -130,6 +129,7 @@ class SimulatorMainWindow(QWidget):
         # Visualization Config Panel
         self.viz_config = VizConfigPanel()
         self.viz_config.configChanged.connect(self.robot_gl.set_mesh_transform)
+        self.video_panel = VideoStreamPanel(self.video_viewer)
 
         tabs = QTabWidget()
         tabs.addTab(self.control_panel, "Simulator")
@@ -137,6 +137,7 @@ class SimulatorMainWindow(QWidget):
         tabs.addTab(self.bridge_chassis_panel, "Chassis control")
         tabs.addTab(self.bridge_command_panel, "Robot commands")
         tabs.addTab(self.viz_config, "Viz Config")
+        tabs.addTab(self.video_panel, "Video stream")
         
         controls_layout.addWidget(tabs)
         self.splitter.addWidget(controls_container)
@@ -165,3 +166,4 @@ class SimulatorMainWindow(QWidget):
 
     def shutdown(self) -> None:
         self.robot_link_panel.shutdown()
+        self.video_panel.shutdown()
