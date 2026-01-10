@@ -15,6 +15,7 @@ from panandtilt import PanTiltController, PanTiltGimbalController
 from robot_control import EmotionPolicy, FaceController, GyroCalibrator, SerialReadWriter
 from robot_control.serial_bridge_config import SerialBridgeConfig
 from robot_control.serial_bridge_server import SerialBridgeServer
+from robot_control.video_stream_server import VideoStreamServer
 
 try:  # Reuse the palette from the interactive demo when available.
     from axon_ui import apply_dark_palette as apply_palette
@@ -92,6 +93,16 @@ def main() -> int:
         bridge,
         description="TCP telemetry bridge",
     )
+    video_stream = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
+    if video_stream.start():
+        stack.register(
+            OsiLayer.TRANSPORT,
+            "VideoStreamServer",
+            video_stream,
+            description="USB camera stream",
+        )
+    else:
+        LOGGER.warning("Video stream server failed to start on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
 
     app = QApplication(sys.argv)
     app.setApplicationDisplayName("Axon Runtime")
@@ -135,6 +146,7 @@ def main() -> int:
         description="Qt polling loop",
     )
     app.aboutToQuit.connect(runtime.stop)
+    app.aboutToQuit.connect(video_stream.stop)
 
     LOGGER.info("%s", describe_stack(stack))
 
