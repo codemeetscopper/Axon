@@ -5,6 +5,7 @@ import signal
 import sys
 import time
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from axon_ros.osi import OsiLayer, OsiStack, describe_stack
@@ -37,6 +38,17 @@ def _configure_logging(level: str) -> None:
         level=getattr(logging, level.upper(), logging.INFO),
         format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
     )
+
+
+def _start_video_stream(server: VideoStreamServer) -> None:
+    if server.start():
+        LOGGER.info("Video stream server listening on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
+    else:
+        LOGGER.warning(
+            "Video stream server failed to start on %s:%s",
+            DEFAULT_BRIDGE_HOST,
+            DEFAULT_VIDEO_PORT,
+        )
 
 
 def main() -> int:
@@ -87,19 +99,13 @@ def main() -> int:
         apply_palette(app)
 
     video_stream = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
-    if video_stream.start():
-        stack.register(
-            OsiLayer.TRANSPORT,
-            "VideoStreamServer",
-            video_stream,
-            description="USB camera stream",
-        )
-    else:
-        LOGGER.warning(
-            "Video stream server failed to start on %s:%s",
-            DEFAULT_BRIDGE_HOST,
-            DEFAULT_VIDEO_PORT,
-        )
+    stack.register(
+        OsiLayer.TRANSPORT,
+        "VideoStreamServer",
+        video_stream,
+        description="USB camera stream",
+    )
+    QTimer.singleShot(0, lambda: _start_video_stream(video_stream))
 
     face = RoboticFaceWidget()
     policy = EmotionPolicy()
