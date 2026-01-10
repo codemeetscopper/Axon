@@ -11,8 +11,8 @@ from PySide6.QtNetwork import QAbstractSocket, QHostAddress, QTcpServer, QTcpSoc
 class VideoStreamServer(QObject):
     def __init__(
         self,
-        host: str = "0.0.0.0",
-        port: int = 8770,
+        host: str = "192.168.1.169",
+        port: int = 12333,
         parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
