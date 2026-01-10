@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import errno
+import glob
 import json
 import logging
 import socket
 import struct
 import threading
 import time
-from typing import Optional
+from typing import Iterable, Optional
 
 import cv2
 
@@ -19,7 +20,8 @@ class VideoStreamServer:
         self,
         host: str = "0.0.0.0",
         port: int = 8770,
-        device_index: int = 0,
+        device_index: int | None = 0,
+        device_path: str | None = None,
         width: int = 640,
         height: int = 480,
         fps: int = 30,
@@ -27,6 +29,7 @@ class VideoStreamServer:
         self._host = host
         self._port = port
         self._device_index = device_index
+        self._device_path = device_path
         self._width = width
         self._height = height
         self._fps = fps
@@ -38,6 +41,7 @@ class VideoStreamServer:
         self._clients: dict[socket.socket, bytearray] = {}
         self._clients_lock = threading.Lock()
         self._bound_port: Optional[int] = None
+        self._last_device_error: Optional[str] = None
 
     @property
     def bound_port(self) -> Optional[int]:
@@ -97,15 +101,19 @@ class VideoStreamServer:
             self._thread.join(timeout=1.0)
 
     def _run(self) -> None:
-        capture = cv2.VideoCapture(self._device_index)
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(self._width))
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self._height))
-        capture.set(cv2.CAP_PROP_FPS, float(self._fps))
+        capture = self._open_capture()
         frame_interval = 1.0 / max(self._fps, 1)
         try:
             while not self._stop_event.is_set():
                 self._accept_clients()
                 self._read_controls()
+
+                if capture is None or not capture.isOpened():
+                    if capture is not None:
+                        capture.release()
+                    capture = self._open_capture()
+                    time.sleep(0.2)
+                    continue
 
                 ok, frame = capture.read()
                 if not ok:
@@ -125,7 +133,8 @@ class VideoStreamServer:
                 self._broadcast(data)
                 time.sleep(frame_interval)
         finally:
-            capture.release()
+            if capture is not None:
+                capture.release()
 
     def _accept_clients(self) -> None:
         if self._server_socket is None:
@@ -193,3 +202,43 @@ class VideoStreamServer:
             client.close()
         except OSError:
             pass
+
+    def _open_capture(self) -> Optional[cv2.VideoCapture]:
+        candidates = list(self._device_candidates())
+        for candidate in candidates:
+            capture = self._open_candidate(candidate)
+            if capture is not None and capture.isOpened():
+                self._last_device_error = None
+                LOGGER.info("Video stream using camera %s", candidate)
+                return capture
+            if capture is not None:
+                capture.release()
+        if candidates:
+            message = f"Failed to open any camera device from {candidates}"
+        else:
+            message = "No camera devices found."
+        if message != self._last_device_error:
+            LOGGER.warning("%s", message)
+            self._last_device_error = message
+        return None
+
+    def _device_candidates(self) -> Iterable[str | int]:
+        if self._device_path:
+            yield self._device_path
+            return
+        if self._device_index is not None:
+            yield self._device_index
+        for path in glob.glob("/dev/video*"):
+            yield path
+
+    def _open_candidate(self, candidate: str | int) -> Optional[cv2.VideoCapture]:
+        if isinstance(candidate, str):
+            capture = cv2.VideoCapture(candidate, cv2.CAP_V4L2)
+        else:
+            capture = cv2.VideoCapture(candidate, cv2.CAP_V4L2)
+        if not capture.isOpened():
+            return capture
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(self._width))
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self._height))
+        capture.set(cv2.CAP_PROP_FPS, float(self._fps))
+        return capture
