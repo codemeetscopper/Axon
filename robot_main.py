@@ -80,6 +80,16 @@ def main() -> int:
         bridge,
         description="TCP telemetry bridge",
     )
+    video_stream = VideoStreamServer(host=DEFAULT_BRIDGE_HOST, port=DEFAULT_VIDEO_PORT)
+    if video_stream.start():
+        stack.register(
+            OsiLayer.TRANSPORT,
+            "VideoStreamServer",
+            video_stream,
+            description="USB camera stream",
+        )
+    else:
+        LOGGER.warning("Video stream server failed to start on %s:%s", DEFAULT_BRIDGE_HOST, DEFAULT_VIDEO_PORT)
 
     app = QApplication(sys.argv)
     app.setApplicationDisplayName("Axon Runtime")
