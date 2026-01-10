@@ -1,0 +1,23 @@
+serial:
+  port: socket://127.0.0.1:7000
+  baudrate: 115200
+  reconnect_delay_s: 1.0
+  read_timeout_s: 0.5
+  init_commands:
+    - {"T": 131, "cmd": 1}
+    - {"T": 143, "cmd": 1}
+
+network:
+  host: 0.0.0.0
+  port: 9000
+  ping_interval_s: 5.0
+  ping_timeout_s: 15.0
+  max_clients: 16
+
+watchdog:
+  timeout_s: 0.5
+  stop_command: {"T": 1, "L": 0.0, "R": 0.0}
+
+logging:
+  level: INFO
+  json: true
