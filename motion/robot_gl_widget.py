@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from stl import mesh
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
@@ -35,8 +37,17 @@ class StlLoader(QObject):
             print(f"Error loading STL: {e}")
             self.finished.emit(None, None, 1.0)
 
+DEFAULT_STL_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "axon_ros",
+    "ui",
+    "default.stl",
+)
+
+
 class RobotGLWidget(QOpenGLWidget):
-    def __init__(self, parent=None, stl_path=None, scale=1.4):
+    def __init__(self, parent=None, scale=1.4):
         super().__init__(parent)
         self.x_rot = 0
         self.y_rot = 0
@@ -44,7 +55,7 @@ class RobotGLWidget(QOpenGLWidget):
         self.mesh_data = None
         self.display_list = None
         self.scale = scale
-        self.stl_path = stl_path
+        self.stl_path = DEFAULT_STL_PATH
         self.loader_thread = None
         self.center_offset = np.array([0.0, 0.0, 0.0])
         self.auto_scale = 1.0
@@ -56,10 +67,7 @@ class RobotGLWidget(QOpenGLWidget):
         self.mesh_rot_y = 0
         self.mesh_rot_z = 0
         
-        if stl_path:
-            self.start_loading(stl_path)
-        else:
-            self.generate_default_cube()
+        self.start_loading(self.stl_path)
 
     # ... (keep existing methods)
 
