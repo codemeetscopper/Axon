@@ -5,7 +5,6 @@ import struct
 from typing import Optional
 
 from PySide6.QtCore import QObject, QBuffer, QIODevice, Slot
-from PySide6.QtMultimedia import QCamera, QMediaCaptureSession, QVideoSink
 from PySide6.QtNetwork import QAbstractSocket, QHostAddress, QTcpServer, QTcpSocket
 
 
@@ -24,16 +23,22 @@ class VideoStreamServer(QObject):
         self._clients: dict[QTcpSocket, bytearray] = {}
         self._quality = 70
 
-        self._camera = QCamera()
-        self._capture_session = QMediaCaptureSession()
-        self._video_sink = QVideoSink()
-        self._capture_session.setCamera(self._camera)
-        self._capture_session.setVideoSink(self._video_sink)
-        self._video_sink.videoFrameChanged.connect(self._on_frame)
+        self._camera = None
+        self._capture_session = None
+        self._video_sink = None
 
     def start(self) -> bool:
         if self._server.isListening():
             return True
+        if self._camera is None:
+            from PySide6.QtMultimedia import QCamera, QMediaCaptureSession, QVideoSink
+
+            self._camera = QCamera()
+            self._capture_session = QMediaCaptureSession()
+            self._video_sink = QVideoSink()
+            self._capture_session.setCamera(self._camera)
+            self._capture_session.setVideoSink(self._video_sink)
+            self._video_sink.videoFrameChanged.connect(self._on_frame)
         started = self._server.listen(QHostAddress(self._host), self._port)
         if started:
             self._camera.start()
@@ -46,7 +51,8 @@ class VideoStreamServer(QObject):
             client.disconnectFromHost()
             client.close()
         self._clients.clear()
-        self._camera.stop()
+        if self._camera is not None:
+            self._camera.stop()
 
     @Slot()
     def _handle_connection(self) -> None:
