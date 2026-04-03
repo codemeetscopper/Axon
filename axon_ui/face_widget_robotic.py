@@ -4,8 +4,8 @@ import math
 import random
 from typing import Dict, Tuple
 
-from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QTimer, QVariantAnimation, Qt
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
+from PySide6.QtCore import QEasingCurve, QPointF, QRectF, QTimer, QVariantAnimation, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from axon_ui.emotion_preset import EmotionPreset
@@ -13,6 +13,8 @@ from axon_ui.emotion_preset import EmotionPreset
 
 class RoboticFaceWidget(QWidget):
     """Animated robotic face widget with emotion and orientation controls."""
+
+    doubleTapped = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -52,7 +54,13 @@ class RoboticFaceWidget(QWidget):
         self._battery_voltage: float | None = None
         self._low_battery_forced = False
 
+        # Voice chat overlay text
+        self._chat_text: str = ""
+        self._chat_text_opacity: float = 0.0
+        self._speaking = False
+
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
 
     def available_emotions(self) -> Tuple[str, ...]:
         return tuple(self._presets.keys())
@@ -86,6 +94,28 @@ class RoboticFaceWidget(QWidget):
         if roll is not None:
             self._orientation["roll"] = float(max(-30.0, min(30.0, roll)))
         self.update()
+
+    def set_chat_text(self, text: str) -> None:
+        """Set text to display at the bottom of the face."""
+        self._chat_text = text
+        self._chat_text_opacity = 1.0
+        self.update()
+
+    def clear_chat_text(self) -> None:
+        self._chat_text = ""
+        self._chat_text_opacity = 0.0
+        self.update()
+
+    def set_speaking(self, speaking: bool) -> None:
+        """Enable/disable mouth movement for speech."""
+        self._speaking = speaking
+        if not speaking:
+            self._state["mouth_open"] = self._target_state.get("mouth_open", 0.05)
+        self.update()
+
+    def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
+        self.doubleTapped.emit()
+        super().mouseDoubleClickEvent(event)
 
     def set_battery_voltage(self, voltage: float) -> None:
         """Update battery voltage and enforce default fear when critically low."""
@@ -130,6 +160,14 @@ class RoboticFaceWidget(QWidget):
             self._time_since_blink = 0.0
             self._next_blink_at = random.uniform(2.0, 5.0)
 
+        # Animate mouth while speaking
+        if self._speaking:
+            self._state["mouth_open"] = 0.3 + 0.35 * abs(math.sin(self._time * 6.0))
+
+        # Fade chat text slowly (takes ~30s to fully fade)
+        if self._chat_text and self._chat_text_opacity > 0.0:
+            self._chat_text_opacity = max(0.0, self._chat_text_opacity - dt * 0.03)
+
         self.update()
 
     # ------------------------------------------------------------------
@@ -169,8 +207,7 @@ class RoboticFaceWidget(QWidget):
         painter.rotate(self._orientation["roll"])
         painter.translate(-center)
 
-        # 2. Head Outline: Glowing HUD frame
-        self._draw_hud_head_frame(painter, face_rect)
+        # 2. Head Outline: removed for cleaner look
 
         accent_color: QColor = self._state["accent_color"]
         
@@ -232,6 +269,10 @@ class RoboticFaceWidget(QWidget):
         self._draw_holographic_icon(painter, face_rect, accent_color)
 
         painter.restore()
+
+        # 7. Chat text overlay at bottom
+        if self._chat_text and self._chat_text_opacity > 0.01:
+            self._draw_chat_text(painter, self.rect(), accent_color)
 
     # ------------------------------------------------------------------
     # Cyberpunk Drawing Helpers
@@ -549,6 +590,56 @@ class RoboticFaceWidget(QWidget):
             
         painter.restore()
 
+
+    def _draw_chat_text(self, painter: QPainter, rect: QRectF, accent: QColor) -> None:
+        painter.save()
+        painter.resetTransform()
+
+        alpha = int(self._chat_text_opacity * 240)
+        font = QFont()
+        font.setFamily("monospace")
+        font.setPixelSize(18)
+        font.setBold(True)
+        painter.setFont(font)
+
+        metrics = painter.fontMetrics()
+        line_height = metrics.height() + 4
+        margin = 20
+        max_width = int(rect.width() - margin * 2)
+
+        # Word-wrap text into lines
+        words = self._chat_text.split()
+        lines: list[str] = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip()
+            if metrics.horizontalAdvance(test) <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            painter.restore()
+            return
+
+        # Background bar sized to content
+        padding = 12
+        bar_height = len(lines) * line_height + padding * 2
+        bar_rect = QRectF(0, rect.height() - bar_height, rect.width(), bar_height)
+        painter.fillRect(bar_rect, QColor(0, 0, 0, int(alpha * 0.7)))
+
+        # Draw lines
+        text_color = QColor(accent.red(), accent.green(), accent.blue(), alpha)
+        painter.setPen(text_color)
+        y = rect.height() - bar_height + padding + metrics.ascent()
+        for line in lines:
+            painter.drawText(int(margin), int(y), line)
+            y += line_height
+
+        painter.restore()
 
     # ------------------------------------------------------------------
     # Utilities

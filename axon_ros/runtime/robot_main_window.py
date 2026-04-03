@@ -29,6 +29,10 @@ class RobotMainWindow(QWidget):
         self._register_info_controls(overlays)
         self._build_ui()
 
+    @property
+    def chat_overlay(self):
+        return self._display.chat_overlay
+
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

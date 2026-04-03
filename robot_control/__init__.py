@@ -18,3 +18,20 @@ __all__ = [
     "SerialBridgeConfig",
     "SerialBridgeServer",
 ]
+
+try:
+    from .speech_listener import SpeechListener
+    from .chat_engine import ChatEngine, ChatResponse
+    from .speech_synthesizer import SpeechSynthesizer
+    from .voice_chat_controller import VoiceChatController, VoiceChatState
+
+    __all__ += [
+        "SpeechListener",
+        "ChatEngine",
+        "ChatResponse",
+        "SpeechSynthesizer",
+        "VoiceChatController",
+        "VoiceChatState",
+    ]
+except (ImportError, OSError):
+    pass

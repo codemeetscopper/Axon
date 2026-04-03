@@ -52,6 +52,11 @@ class RoboticFaceWidget(QWidget):
         self._battery_voltage: float | None = None
         self._low_battery_forced = False
 
+        # Voice chat overlay text
+        self._chat_text: str = ""
+        self._chat_text_opacity: float = 0.0
+        self._speaking = False
+
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
 
     def available_emotions(self) -> Tuple[str, ...]:
@@ -85,6 +90,24 @@ class RoboticFaceWidget(QWidget):
             self._orientation["pitch"] = float(max(-30.0, min(30.0, pitch)))
         if roll is not None:
             self._orientation["roll"] = float(max(-30.0, min(30.0, roll)))
+        self.update()
+
+    def set_chat_text(self, text: str) -> None:
+        """Set text to display at the bottom of the face."""
+        self._chat_text = text
+        self._chat_text_opacity = 1.0
+        self.update()
+
+    def clear_chat_text(self) -> None:
+        self._chat_text = ""
+        self._chat_text_opacity = 0.0
+        self.update()
+
+    def set_speaking(self, speaking: bool) -> None:
+        """Enable/disable mouth movement for speech."""
+        self._speaking = speaking
+        if not speaking:
+            self._state["mouth_open"] = self._target_state.get("mouth_open", 0.05)
         self.update()
 
     def set_battery_voltage(self, voltage: float) -> None:
@@ -129,6 +152,14 @@ class RoboticFaceWidget(QWidget):
             self._blink_phase = 0.0
             self._time_since_blink = 0.0
             self._next_blink_at = random.uniform(2.0, 5.0)
+
+        # Animate mouth while speaking
+        if self._speaking:
+            self._state["mouth_open"] = 0.3 + 0.35 * abs(math.sin(self._time * 6.0))
+
+        # Fade chat text slowly
+        if self._chat_text and self._chat_text_opacity > 0.0:
+            self._chat_text_opacity = max(0.0, self._chat_text_opacity - dt * 0.08)
 
         self.update()
 
@@ -231,6 +262,10 @@ class RoboticFaceWidget(QWidget):
         self._draw_emotion_icon(painter, face_rect, accent_color)
 
         painter.restore()
+
+        # Chat text overlay at bottom
+        if self._chat_text and self._chat_text_opacity > 0.01:
+            self._draw_chat_text(painter, self.rect(), accent_color)
 
     # ------------------------------------------------------------------
     # Feature drawing helpers
@@ -829,6 +864,28 @@ class RoboticFaceWidget(QWidget):
         path = QPainterPath()
         path.addEllipse(rect)
         painter.drawPath(path)
+        painter.restore()
+
+    def _draw_chat_text(self, painter: QPainter, rect: QRectF, accent: QColor) -> None:
+        painter.save()
+        alpha = int(self._chat_text_opacity * 220)
+        font = QFont("Consolas", 14)
+        font.setBold(True)
+        painter.setFont(font)
+
+        # Background bar
+        bar_height = 50
+        bar_rect = QRectF(rect.left(), rect.bottom() - bar_height, rect.width(), bar_height)
+        painter.fillRect(bar_rect, QColor(0, 0, 0, int(alpha * 0.6)))
+
+        # Text
+        text_color = QColor(accent.red(), accent.green(), accent.blue(), alpha)
+        painter.setPen(text_color)
+
+        metrics = painter.fontMetrics()
+        elided = metrics.elidedText(self._chat_text, Qt.TextElideMode.ElideRight, int(rect.width() - 40))
+        text_rect = QRectF(rect.left() + 20, rect.bottom() - bar_height, rect.width() - 40, bar_height)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
         painter.restore()
 
     # ------------------------------------------------------------------

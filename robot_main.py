@@ -84,6 +84,34 @@ def main() -> int:
     stack.register(OsiLayer.PRESENTATION, "GyroCalibrator", calibrator)
     stack.register(OsiLayer.APPLICATION, "RobotMainWindow", window)
 
+    # --- Voice chat (optional, degrades gracefully) ---
+    voice_chat = None
+    try:
+        from robot_control import (
+            SpeechListener, ChatEngine, SpeechSynthesizer, VoiceChatController,
+        )
+
+        listener = SpeechListener()
+        chat_engine = ChatEngine(serial_reader=reader)
+        synthesizer = SpeechSynthesizer()
+        voice_chat = VoiceChatController(
+            face, controller, listener, chat_engine, synthesizer,
+            chat_overlay=window.chat_overlay,
+        )
+        stack.register(OsiLayer.PRESENTATION, "SpeechListener", listener,
+                       description="Vosk STT mic input")
+        stack.register(OsiLayer.PRESENTATION, "SpeechSynthesizer", synthesizer,
+                       description="espeak-ng TTS output")
+        stack.register(OsiLayer.APPLICATION, "ChatEngine", chat_engine,
+                       description="Claude AI chatbot")
+        stack.register(OsiLayer.APPLICATION, "VoiceChatController", voice_chat,
+                       description="Voice chat orchestrator")
+        LOGGER.info("Voice chat initialised")
+    except ImportError:
+        LOGGER.warning("Voice chat dependencies not installed; voice chat disabled")
+    except Exception as exc:
+        LOGGER.warning("Voice chat failed to initialise: %s", exc)
+
     runtime = RobotRuntime(
         reader,
         controller,
@@ -99,6 +127,8 @@ def main() -> int:
         description="Qt polling loop",
     )
     app.aboutToQuit.connect(runtime.stop)
+    if voice_chat is not None:
+        app.aboutToQuit.connect(voice_chat.stop)
 
     LOGGER.info("%s", describe_stack(stack))
 
@@ -106,6 +136,8 @@ def main() -> int:
     signal.signal(signal.SIGINT, lambda *_: app.quit())
 
     runtime.start()
+    if voice_chat is not None:
+        voice_chat.start()
     window.showFullScreen()
 
     try:

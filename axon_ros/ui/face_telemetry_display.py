@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from axon_ui import InfoPanel, RoboticFaceWidget, TelemetryPanel
+from axon_ui.chat_bubble_overlay import ChatBubbleOverlay
 
 class FaceTelemetryDisplay(QWidget):
     """Composite widget that overlays telemetry/info controls on the face widget."""
@@ -143,6 +144,11 @@ class FaceTelemetryDisplay(QWidget):
 
         stack.addWidget(overlay)
 
+        # --- CHAT BUBBLE LAYER ---
+        self._chat_overlay = ChatBubbleOverlay(self)
+        stack.addWidget(self._chat_overlay)
+        self._chat_overlay.raise_()
+
         overlay.raise_()
 
         # ------------------------------------
@@ -167,6 +173,10 @@ class FaceTelemetryDisplay(QWidget):
     # ----------------------------------------------------------------------
     # EVENTS
     # ----------------------------------------------------------------------
+    @property
+    def chat_overlay(self) -> ChatBubbleOverlay:
+        return self._chat_overlay
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_overlay_geometry()

@@ -29,6 +29,7 @@ class FaceController(QObject):
         self._sleep_emotion = "sleepy"
         self._sleeping = False
         self._previous_sample: SensorSample | None = None
+        self._emotion_held = False
         self._initialize_face()
 
     def _initialize_face(self) -> None:
@@ -40,10 +41,18 @@ class FaceController(QObject):
             self._face.set_emotion(choice)
             self._current_emotion = choice
 
+    def set_emotion_hold(self, held: bool) -> None:
+        """When held, orientation updates continue but emotion changes are suppressed."""
+        self._emotion_held = held
+
     def apply_sample(self, sample: SensorSample) -> None:
         """Update the face to reflect the latest telemetry sample."""
 
         self._face.set_orientation(**sample.to_orientation())
+
+        if self._emotion_held:
+            self._previous_sample = sample
+            return
 
         now = monotonic()
         previous = self._previous_sample
